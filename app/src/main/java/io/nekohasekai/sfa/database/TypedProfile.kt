@@ -39,6 +39,25 @@ class TypedProfile() : Parcelable {
     var lastUpdated: Date = Date(0)
     var autoUpdate: Boolean = false
     var autoUpdateInterval = 60
+    var subscriptionUpload: Long = UNKNOWN_SUBSCRIPTION_TRAFFIC
+    var subscriptionDownload: Long = UNKNOWN_SUBSCRIPTION_TRAFFIC
+    var subscriptionTotal: Long = UNKNOWN_SUBSCRIPTION_TRAFFIC
+
+    val subscriptionUserInfo: SubscriptionUserInfo?
+        get() {
+            if (subscriptionUpload < 0L || subscriptionDownload < 0L || subscriptionTotal <= 0L) return null
+            return SubscriptionUserInfo(
+                upload = subscriptionUpload,
+                download = subscriptionDownload,
+                total = subscriptionTotal,
+            )
+        }
+
+    fun setSubscriptionUserInfo(userInfo: SubscriptionUserInfo?) {
+        subscriptionUpload = userInfo?.upload ?: UNKNOWN_SUBSCRIPTION_TRAFFIC
+        subscriptionDownload = userInfo?.download ?: UNKNOWN_SUBSCRIPTION_TRAFFIC
+        subscriptionTotal = userInfo?.total ?: UNKNOWN_SUBSCRIPTION_TRAFFIC
+    }
 
     constructor(reader: Parcel) : this() {
         val version = reader.readInt()
@@ -50,21 +69,31 @@ class TypedProfile() : Parcelable {
         if (version >= 1) {
             autoUpdateInterval = reader.readInt()
         }
+        if (version >= 2) {
+            subscriptionUpload = reader.readLong()
+            subscriptionDownload = reader.readLong()
+            subscriptionTotal = reader.readLong()
+        }
     }
 
     override fun writeToParcel(writer: Parcel, flags: Int) {
-        writer.writeInt(1)
+        writer.writeInt(2)
         writer.writeString(path)
         writer.writeInt(type.ordinal)
         writer.writeString(remoteURL)
         writer.writeInt(if (autoUpdate) 1 else 0)
         writer.writeLong(lastUpdated.time)
         writer.writeInt(autoUpdateInterval)
+        writer.writeLong(subscriptionUpload)
+        writer.writeLong(subscriptionDownload)
+        writer.writeLong(subscriptionTotal)
     }
 
     override fun describeContents(): Int = 0
 
     companion object CREATOR : Parcelable.Creator<TypedProfile> {
+        private const val UNKNOWN_SUBSCRIPTION_TRAFFIC = -1L
+
         override fun createFromParcel(parcel: Parcel): TypedProfile = TypedProfile(parcel)
 
         override fun newArray(size: Int): Array<TypedProfile?> = arrayOfNulls(size)

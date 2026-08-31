@@ -70,12 +70,16 @@ object Settings {
     var autoUpdateEnabled by dataStore.boolean(SettingsKey.AUTO_UPDATE_ENABLED) { false }
     var dynamicNotification by dataStore.boolean(SettingsKey.DYNAMIC_NOTIFICATION) { true }
     var disableDeprecatedWarnings by dataStore.boolean(SettingsKey.DISABLE_DEPRECATED_WARNINGS) { false }
+    var logPaused by dataStore.boolean(SettingsKey.LOG_PAUSED) { false }
+    var logFilterLevel by dataStore.int(SettingsKey.LOG_FILTER_LEVEL) { 7 }
 
     const val PER_APP_PROXY_DISABLED = 0
     const val PER_APP_PROXY_EXCLUDE = 1
     const val PER_APP_PROXY_INCLUDE = 2
 
     var autoRedirect by dataStore.boolean(SettingsKey.AUTO_REDIRECT) { false }
+    var closeConnectionsOnNodeSwitch by dataStore.boolean(SettingsKey.CLOSE_CONNECTIONS_ON_NODE_SWITCH) { false }
+    var rttDelayTest by dataStore.boolean(SettingsKey.RTT_DELAY_TEST) { false }
     var perAppProxyEnabled by dataStore.boolean(SettingsKey.PER_APP_PROXY_ENABLED) { false }
     var perAppProxyMode by dataStore.int(SettingsKey.PER_APP_PROXY_MODE) { PER_APP_PROXY_EXCLUDE }
     var perAppProxyList by dataStore.stringSet(SettingsKey.PER_APP_PROXY_LIST) { emptySet() }

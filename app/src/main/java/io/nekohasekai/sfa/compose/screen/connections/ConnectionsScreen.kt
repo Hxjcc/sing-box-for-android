@@ -77,6 +77,7 @@ fun ConnectionsPage(
     showTitle: Boolean = true,
     showTopBar: Boolean = false,
     onConnectionClick: (String) -> Unit = {},
+    manageVisibility: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -279,6 +280,7 @@ fun ConnectionsPage(
             onConnectionClick = { connection -> onConnectionClick(connection.id) },
             listHeaderContent = headerContent,
             asSheet = true,
+            manageVisibility = manageVisibility,
             modifier = modifier.fillMaxSize(),
         )
     } else {
@@ -291,6 +293,7 @@ fun ConnectionsPage(
                 serviceStatus = serviceStatus,
                 viewModel = viewModel,
                 onConnectionClick = { connection -> onConnectionClick(connection.id) },
+                manageVisibility = manageVisibility,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -378,17 +381,20 @@ fun ConnectionsScreen(
     onConnectionClick: (Connection) -> Unit = {},
     listHeaderContent: (@Composable () -> Unit)? = null,
     asSheet: Boolean = false,
+    manageVisibility: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.setVisible(true)
-    }
+    if (manageVisibility) {
+        LaunchedEffect(Unit) {
+            viewModel.setVisible(true)
+        }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            viewModel.setVisible(false)
+        DisposableEffect(Unit) {
+            onDispose {
+                viewModel.setVisible(false)
+            }
         }
     }
 

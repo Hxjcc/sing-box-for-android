@@ -9,6 +9,8 @@ import io.nekohasekai.sfa.R
 import io.nekohasekai.sfa.bg.UpdateProfileWork
 import io.nekohasekai.sfa.database.Profile
 import io.nekohasekai.sfa.database.ProfileManager
+import io.nekohasekai.sfa.database.Settings
+import io.nekohasekai.sfa.database.SubscriptionUserInfo
 import io.nekohasekai.sfa.database.TypedProfile
 import io.nekohasekai.sfa.utils.HTTPClient
 import kotlinx.coroutines.Dispatchers
@@ -273,7 +275,7 @@ class NewProfileViewModel(application: Application) : AndroidViewModel(applicati
         configFile.writeText(configContent)
 
         // Create profile in database and select it
-        ProfileManager.create(profile, andSelect = true)
+        ProfileManager.create(profile, andSelect = Settings.selectedProfile == -1L)
 
         return profile
     }
@@ -300,14 +302,19 @@ class NewProfileViewModel(application: Application) : AndroidViewModel(applicati
         typedProfile.path = configFile.path
 
         // Fetch initial config - this MUST succeed for remote profiles
-        val content = HTTPClient().use { it.getString(state.remoteUrl) }
-        Libbox.checkConfig(content)
-        val configContent = content
+        val response = HTTPClient().use { it.getStringWithHeaders(state.remoteUrl) }
+        Libbox.checkConfig(response.content)
+        if (response.headers != null) {
+            typedProfile.setSubscriptionUserInfo(
+                SubscriptionUserInfo.parse(response.header(SubscriptionUserInfo.HEADER_NAME)),
+            )
+        }
+        val configContent = response.content
 
         configFile.writeText(configContent)
 
         // Create profile in database and select it
-        ProfileManager.create(profile, andSelect = true)
+        ProfileManager.create(profile, andSelect = Settings.selectedProfile == -1L)
 
         // Reconfigure updater if auto-update is enabled
         if (state.autoUpdate) {

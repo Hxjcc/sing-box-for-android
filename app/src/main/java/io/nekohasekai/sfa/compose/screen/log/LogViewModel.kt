@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import io.nekohasekai.libbox.LogEntry
 import io.nekohasekai.sfa.compose.util.AnsiColorUtils
 import io.nekohasekai.sfa.constant.Status
+import io.nekohasekai.sfa.database.Settings
 import io.nekohasekai.sfa.utils.AppLifecycleObserver
 import io.nekohasekai.sfa.utils.CommandClient
 import io.nekohasekai.sfa.utils.CommandTarget
@@ -17,8 +18,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.LinkedList
 
+private fun savedLogUiState(): LogUiState = LogUiState(
+    isPaused = Settings.logPaused,
+    filterLogLevel = LogLevel.entries.find { it.priority == Settings.logFilterLevel } ?: LogLevel.Default,
+)
+
 class LogViewModel :
-    BaseLogViewModel(),
+    BaseLogViewModel(savedLogUiState()),
     CommandClient.Handler {
     companion object {
         private val maxLines = 3000
@@ -105,7 +111,6 @@ class LogViewModel :
         viewModelScope.launch(Dispatchers.Main) {
             allLogs.clear()
             bufferedLogs.clear()
-            _uiState.update { it.copy(isPaused = false) }
             updateDisplayedLogs()
         }
     }
@@ -168,7 +173,13 @@ class LogViewModel :
         }
 
         _uiState.update { it.copy(isPaused = !it.isPaused) }
+        Settings.logPaused = _uiState.value.isPaused
         updateDisplayedLogs()
+    }
+
+    override fun setLogLevel(level: LogLevel) {
+        super.setLogLevel(level)
+        Settings.logFilterLevel = level.priority
     }
 
     override fun onCleared() {

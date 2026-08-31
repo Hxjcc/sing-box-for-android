@@ -213,6 +213,10 @@
     <string name="android_documentation">Документация Android</string>
     <string name="auto_redirect">Автоматическое перенаправление</string>
     <string name="auto_redirect_description">Требуются права ROOT</string>
+    <string name="close_connections_on_node_switch">Закрывать соединения при смене узла</string>
+    <string name="close_connections_on_node_switch_description">Закрывать активные соединения после переключения</string>
+    <string name="rtt_delay_test">Тест задержки RTT</string>
+    <string name="rtt_delay_test_description">Измерять RTT через прогретое соединение</string>
     <string name="system_http_proxy">Системный HTTP-прокси</string>
     <string name="update_settings">Настройки обновлений</string>
 

@@ -99,6 +99,15 @@ class ServiceNotification(private val status: MutableLiveData<Status>, private v
         )
     }
 
+    fun updateProfileName(profileName: String) {
+        Application.notificationManager.notify(
+            notificationId,
+            notificationBuilder
+                .setContentTitle(profileName.takeIf { it.isNotBlank() } ?: "sing-box")
+                .build(),
+        )
+    }
+
     suspend fun start() {
         if (Settings.dynamicNotification && checkPermission()) {
             commandClient.connect()

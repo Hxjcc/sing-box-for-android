@@ -8,9 +8,11 @@ import io.nekohasekai.sfa.compose.model.Group
 import io.nekohasekai.sfa.compose.model.GroupItem
 import io.nekohasekai.sfa.compose.model.toList
 import io.nekohasekai.sfa.constant.Status
+import io.nekohasekai.sfa.database.Settings
 import io.nekohasekai.sfa.utils.AppLifecycleObserver
 import io.nekohasekai.sfa.utils.CommandClient
 import io.nekohasekai.sfa.utils.CommandTarget
+import io.nekohasekai.sfa.utils.RTTDelayTest
 import io.nekohasekai.sfa.utils.RemoteControlManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +43,7 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
     private val _serviceStatus = MutableStateFlow(Status.Stopped)
     val serviceStatus = _serviceStatus.asStateFlow()
     private var lastServiceStatus: Status = Status.Stopped
+    private var syncedRTTMode: Boolean? = null
 
     init {
         if (sharedCommandClient != null) {
@@ -106,6 +109,7 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
             return
         }
         if (status != Status.Started) {
+            syncedRTTMode = null
             updateState {
                 copy(
                     groups = emptyList(),
@@ -176,7 +180,14 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 // Select the new outbound immediately
-                CommandTarget.standaloneClient().selectOutbound(groupTag, itemTag)
+                val client = CommandTarget.standaloneClient()
+                client.selectOutbound(groupTag, itemTag)
+                val closeConnectionsWithoutPrompt = Settings.closeConnectionsOnNodeSwitch
+                val closeConnectionsError = if (closeConnectionsWithoutPrompt) {
+                    runCatching { client.closeConnections() }.exceptionOrNull()
+                } else {
+                    null
+                }
 
                 // Update local state and show snackbar
                 withContext(Dispatchers.Main) {
@@ -190,11 +201,12 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
                                     group
                                 }
                             },
-                            showCloseConnectionsSnackbar = true,
+                            showCloseConnectionsSnackbar = !closeConnectionsWithoutPrompt,
                         )
                     }
                     sendEvent(GroupsEvent.GroupSelected(groupTag, itemTag))
                 }
+                closeConnectionsError?.let(::sendError)
             } catch (e: Exception) {
                 sendError(e)
             }
@@ -226,7 +238,7 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
     fun urlTest(outboundTag: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                CommandTarget.standaloneClient().urlTest(outboundTag)
+                CommandTarget.standaloneClient().urlTest(RTTDelayTest.outboundTag(outboundTag))
             } catch (e: Exception) {
                 sendError(e)
             }
@@ -237,7 +249,7 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
         updateState { copy(testingGroups = testingGroups + groupTag) }
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                CommandTarget.standaloneClient().urlTest(groupTag)
+                CommandTarget.standaloneClient().urlTest(RTTDelayTest.outboundTag(groupTag))
             } catch (e: Exception) {
                 sendError(e)
             } finally {
@@ -267,6 +279,7 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
     }
 
     override fun updateGroups(newGroups: MutableList<OutboundGroup>) {
+        syncRTTModeIfNeeded()
         viewModelScope.launch(Dispatchers.Default) {
             val currentGroups = uiState.value.groups
             val currentByTag = currentGroups.associateBy { it.tag }
@@ -290,6 +303,20 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
                     )
                 }
             }
+        }
+    }
+
+    private fun syncRTTModeIfNeeded() {
+        if (CommandTarget.isRemote) return
+        val enabled = Settings.rttDelayTest
+        if (syncedRTTMode == enabled) return
+        syncedRTTMode = enabled
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { RTTDelayTest.syncMode(enabled) }
+                .onFailure {
+                    syncedRTTMode = null
+                    sendError(it)
+                }
         }
     }
 }

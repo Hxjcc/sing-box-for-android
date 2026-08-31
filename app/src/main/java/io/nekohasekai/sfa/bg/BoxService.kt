@@ -248,6 +248,9 @@ class BoxService(private val service: Service, private val platformInterface: Pl
                 return
             }
         }
+        withContext(Dispatchers.Main) {
+            notification.updateProfileName(lastProfileName)
+        }
     }
 
     override fun getSystemProxyStatus(): SystemProxyStatus? {

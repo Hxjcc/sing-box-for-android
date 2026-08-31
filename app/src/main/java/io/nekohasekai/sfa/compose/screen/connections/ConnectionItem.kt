@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.util.LruCache
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
@@ -31,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +49,8 @@ import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.sfa.R
 import io.nekohasekai.sfa.compose.model.Connection
 import io.nekohasekai.sfa.utils.RemoteControlManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private fun Drawable.toBitmap(): Bitmap {
     if (this is BitmapDrawable) return bitmap
@@ -63,21 +67,36 @@ private fun Drawable.toBitmap(): Bitmap {
 
 data class AppInfo(val icon: ImageBitmap, val label: String)
 
+private val appInfoCache = LruCache<String, AppInfo>(64)
+
 @Composable
 private fun rememberAppInfo(packageName: String): AppInfo? {
     val context = LocalContext.current
-    return remember(packageName) {
-        try {
-            val pm = context.packageManager
-            val appInfo = pm.getApplicationInfo(packageName, 0)
-            AppInfo(
-                icon = appInfo.loadIcon(pm).toBitmap().asImageBitmap(),
-                label = appInfo.loadLabel(pm).toString(),
-            )
-        } catch (e: PackageManager.NameNotFoundException) {
-            null
+    val state = produceState<AppInfo?>(initialValue = null, packageName) {
+        val cached = synchronized(appInfoCache) { appInfoCache.get(packageName) }
+        if (cached != null) {
+            value = cached
+            return@produceState
         }
+
+        val loaded = withContext(Dispatchers.IO) {
+            try {
+                val pm = context.packageManager
+                val appInfo = pm.getApplicationInfo(packageName, 0)
+                AppInfo(
+                    icon = appInfo.loadIcon(pm).toBitmap().asImageBitmap(),
+                    label = appInfo.loadLabel(pm).toString(),
+                )
+            } catch (_: PackageManager.NameNotFoundException) {
+                null
+            }
+        }
+        if (loaded != null) {
+            synchronized(appInfoCache) { appInfoCache.put(packageName, loaded) }
+        }
+        value = loaded
     }
+    return state.value
 }
 
 @OptIn(ExperimentalFoundationApi::class)

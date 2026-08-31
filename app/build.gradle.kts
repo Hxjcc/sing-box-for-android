@@ -97,6 +97,14 @@ android {
             signingConfig = signingConfigs.getByName("release")
             vcsInfo.include = false
         }
+        create("traffic") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".traffic"
+            versionNameSuffix = "-traffic"
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+        }
     }
 
     dependenciesInfo {

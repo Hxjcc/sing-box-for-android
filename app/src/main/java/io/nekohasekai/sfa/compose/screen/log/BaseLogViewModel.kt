@@ -15,10 +15,10 @@ import java.util.LinkedList
 import java.util.concurrent.atomic.AtomicLong
 
 @OptIn(FlowPreview::class)
-abstract class BaseLogViewModel :
+abstract class BaseLogViewModel(initialState: LogUiState = LogUiState()) :
     ViewModel(),
     LogViewerViewModel {
-    protected val _uiState = MutableStateFlow(LogUiState())
+    protected val _uiState = MutableStateFlow(initialState)
     override val uiState: StateFlow<LogUiState> = _uiState.asStateFlow()
 
     protected val _autoScrollEnabled = MutableStateFlow(true)
@@ -30,6 +30,7 @@ abstract class BaseLogViewModel :
     protected val _searchQueryInternal = MutableStateFlow("")
     protected val logIdGenerator = AtomicLong(0)
     protected val allLogs = LinkedList<ProcessedLogEntry>()
+    private var pausedBeforeSelection = initialState.isPaused
 
     init {
         viewModelScope.launch {
@@ -61,7 +62,7 @@ abstract class BaseLogViewModel :
         _searchQueryInternal.value = query
     }
 
-    override fun setLogLevel(level: LogLevel) {
+    open override fun setLogLevel(level: LogLevel) {
         _uiState.update { it.copy(filterLogLevel = level) }
         updateDisplayedLogs()
     }
@@ -78,8 +79,9 @@ abstract class BaseLogViewModel :
     override fun toggleSelectionMode() {
         _uiState.update {
             if (it.isSelectionMode) {
-                it.copy(isSelectionMode = false, selectedLogIndices = emptySet(), isPaused = false)
+                it.copy(isSelectionMode = false, selectedLogIndices = emptySet(), isPaused = pausedBeforeSelection)
             } else {
+                pausedBeforeSelection = it.isPaused
                 it.copy(isSelectionMode = true, isPaused = true)
             }
         }
@@ -97,7 +99,7 @@ abstract class BaseLogViewModel :
                 state.copy(
                     isSelectionMode = false,
                     selectedLogIndices = emptySet(),
-                    isPaused = false,
+                    isPaused = pausedBeforeSelection,
                 )
             } else {
                 state.copy(selectedLogIndices = newSelection)
@@ -107,7 +109,7 @@ abstract class BaseLogViewModel :
 
     override fun clearSelection() {
         _uiState.update {
-            it.copy(isSelectionMode = false, selectedLogIndices = emptySet(), isPaused = false)
+            it.copy(isSelectionMode = false, selectedLogIndices = emptySet(), isPaused = pausedBeforeSelection)
         }
     }
 

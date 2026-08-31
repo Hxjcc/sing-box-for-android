@@ -149,6 +149,7 @@
     <string name="profile_type_local">本地</string>
     <string name="profile_type_remote">遠端</string>
     <string name="profile_type_remote_updated">遠端 • %s</string>
+    <string name="profile_traffic_remaining">剩餘 %1$s</string>
     <string name="profile_source_create_new">建立新項目</string>
     <string name="profile_source_import">匯入</string>
     <string name="profile_add_import_file">從檔案匯入</string>
@@ -213,6 +214,10 @@
     <string name="android_documentation">Android 文件</string>
     <string name="auto_redirect">自動重定向</string>
     <string name="auto_redirect_description">需要 ROOT 權限</string>
+    <string name="close_connections_on_node_switch">切換節點時關閉連線</string>
+    <string name="close_connections_on_node_switch_description">切換後自動關閉現有連線</string>
+    <string name="rtt_delay_test">RTT 延遲測速</string>
+    <string name="rtt_delay_test_description">使用預熱連線測量往返延遲</string>
     <string name="system_http_proxy">系統 HTTP 代理</string>
     <string name="update_settings">更新設定</string>
 

@@ -11,6 +11,7 @@ import io.nekohasekai.sfa.constant.Status
 import io.nekohasekai.sfa.database.Profile
 import io.nekohasekai.sfa.database.ProfileManager
 import io.nekohasekai.sfa.database.Settings
+import io.nekohasekai.sfa.database.SubscriptionUserInfo
 import io.nekohasekai.sfa.database.TypedProfile
 import io.nekohasekai.sfa.utils.AppLifecycleObserver
 import io.nekohasekai.sfa.utils.CommandClient
@@ -364,8 +365,14 @@ class DashboardViewModel :
 
             try {
                 // Fetch remote config
-                val content = HTTPClient().use { it.getString(profile.typed.remoteURL) }
+                val response = HTTPClient().use { it.getStringWithHeaders(profile.typed.remoteURL) }
+                val content = response.content
                 Libbox.checkConfig(content)
+                if (response.headers != null) {
+                    profile.typed.setSubscriptionUserInfo(
+                        SubscriptionUserInfo.parse(response.header(SubscriptionUserInfo.HEADER_NAME)),
+                    )
+                }
 
                 // Check if content changed
                 val file = File(profile.typed.path)

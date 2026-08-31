@@ -1,0 +1,158 @@
+diff --git a/common/urltest/urltest.go b/common/urltest/urltest.go
+index 36d4495..3b99925 100644
+--- a/common/urltest/urltest.go
++++ b/common/urltest/urltest.go
+@@ -81,15 +81,19 @@ func (s *HistoryStorage) Close() error {
+ func URLTest(ctx context.Context, link string, detour N.Dialer) (uint16, error) {
+ 	multiplexOutbound, isMultiplexOutbound := common.Cast[adapter.OutboundWithMultiplex](detour)
+ 	if isMultiplexOutbound && multiplexOutbound.MultiplexEnabled() {
+-		_, err := urlTest(ctx, link, detour)
++		_, err := urlTest(ctx, link, detour, false)
+ 		if err != nil {
+ 			return 0, err
+ 		}
+ 	}
+-	return urlTest(ctx, link, detour)
++	return urlTest(ctx, link, detour, false)
+ }
+ 
+-func urlTest(ctx context.Context, link string, detour N.Dialer) (t uint16, err error) {
++func RTTTest(ctx context.Context, link string, detour N.Dialer) (uint16, error) {
++	return urlTest(ctx, link, detour, true)
++}
++
++func urlTest(ctx context.Context, link string, detour N.Dialer, rttOnly bool) (t uint16, err error) {
+ 	if link == "" {
+ 		link = "https://www.gstatic.com/generate_204"
+ 	}
+@@ -142,6 +146,16 @@ func urlTest(ctx context.Context, link string, detour N.Dialer) (t uint16, err e
+ 		return
+ 	}
+ 	resp.Body.Close()
+-	t = uint16(time.Since(start) / time.Millisecond)
++	fullDelay := uint16(time.Since(start) / time.Millisecond)
++	if rttOnly {
++		rttStart := time.Now()
++		rttResponse, rttErr := client.Do(req.WithContext(ctx))
++		if rttErr == nil {
++			rttResponse.Body.Close()
++			t = uint16(time.Since(rttStart) / time.Millisecond)
++			return
++		}
++	}
++	t = fullDelay
+ 	return
+ }
+diff --git a/daemon/started_service.go b/daemon/started_service.go
+index 0ca8e4b..734dbc9 100644
+--- a/daemon/started_service.go
++++ b/daemon/started_service.go
+@@ -6,6 +6,7 @@ import (
+ 	"os"
+ 	"runtime"
+ 	runtimeDebug "runtime/debug"
++	"strings"
+ 	"sync"
+ 	"time"
+ 
+@@ -38,6 +39,7 @@ const APIVersion = 4
+ const (
+ 	urlTestPushMinInterval = 250 * time.Millisecond
+ 	notificationQueueSize  = 16
++	rttTestPrefix          = "__sfa_rtt__:"
+ )
+ 
+ var _ StartedServiceServer = (*StartedService)(nil)
+@@ -718,11 +720,32 @@ func (s *StartedService) URLTest(ctx context.Context, request *URLTestRequest) (
+ 	boxService := s.instance
+ 	s.serviceAccess.RUnlock()
+ 	outboundTag := request.OutboundTag
++	rttTest := strings.HasPrefix(outboundTag, rttTestPrefix)
++	outboundTag = strings.TrimPrefix(outboundTag, rttTestPrefix)
+ 	outbound, isLoaded := boxService.outboundManager.Outbound(outboundTag)
+ 	if !isLoaded {
+ 		return nil, status.Error(codes.NotFound, "outbound not found: "+outboundTag)
+ 	}
+ 	historyStorage := boxService.urlTestHistoryStorage
++	if rttTest {
++		if outboundGroup, isOutboundGroup := outbound.(adapter.OutboundGroup); isOutboundGroup {
++			outbounds := common.FilterNotNil(common.Map(outboundGroup.All(), func(it string) adapter.Outbound {
++				itOutbound, _ := boxService.outboundManager.Outbound(it)
++				return itOutbound
++			}))
++			go group.RTTTestOutbounds(boxService.ctx, boxService.outboundManager, historyStorage, boxService.logFactory.Logger(), outbounds, "", 0, true)
++		} else {
++			go func() {
++				t, err := urltest.RTTTest(boxService.ctx, "", outbound)
++				if err != nil {
++					historyStorage.DeleteURLTestHistory(outboundTag)
++				} else {
++					historyStorage.StoreURLTestHistory(outboundTag, &adapter.URLTestHistory{Time: time.Now(), Delay: t})
++				}
++			}()
++		}
++		return &emptypb.Empty{}, nil
++	}
+ 	urlTest, isURLTest := outbound.(*group.URLTest)
+ 	outboundGroup, isOutboundGroup := outbound.(adapter.OutboundGroup)
+ 	if isURLTest {
+diff --git a/protocol/group/urltest.go b/protocol/group/urltest.go
+index ba3197f..a1b4ef9 100644
+--- a/protocol/group/urltest.go
++++ b/protocol/group/urltest.go
+@@ -395,9 +395,18 @@ type urlTestBatch struct {
+ 	groups   []adapter.OutboundGroup
+ 	access   sync.Mutex
+ 	result   map[string]uint16
++	rtt      bool
+ }
+ 
+ func URLTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool) map[string]uint16 {
++	return testOutbounds(ctx, outboundManager, history, logger, outbounds, link, interval, force, false)
++}
++
++func RTTTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool) map[string]uint16 {
++	return testOutbounds(ctx, outboundManager, history, logger, outbounds, link, interval, force, true)
++}
++
++func testOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool, rtt bool) map[string]uint16 {
+ 	b, _ := batch.New(ctx, batch.WithConcurrencyNum[any](10))
+ 	testBatch := &urlTestBatch{
+ 		ctx:      ctx,
+@@ -407,6 +416,7 @@ func URLTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManag
+ 		batch:    b,
+ 		checked:  make(map[string]bool),
+ 		result:   make(map[string]uint16),
++		rtt:      rtt,
+ 	}
+ 	testBatch.test(outbounds, link, interval, force)
+ 	b.Wait()
+@@ -429,6 +439,13 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, link string, interval
+ 		case *URLTest:
+ 			b.checked[tag] = true
+ 			b.groups = append(b.groups, nested)
++			if b.rtt {
++				b.test(common.FilterNotNil(common.Map(nested.All(), func(it string) adapter.Outbound {
++					member, _ := b.outbound.Outbound(it)
++					return member
++				})), link, interval, force)
++				continue
++			}
+ 			b.batch.Go(tag, func() (any, error) {
+ 				nestedResult, _ := nested.group.urlTest(b.ctx, force)
+ 				b.access.Lock()
+@@ -454,7 +471,13 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, link string, interval
+ 				defer cancel()
+ 				testChan := make(chan urlTestResult, 1)
+ 				go func() {
+-					delay, testErr := urltest.URLTest(testCtx, link, detour)
++					var delay uint16
++					var testErr error
++					if b.rtt {
++						delay, testErr = urltest.RTTTest(testCtx, link, detour)
++					} else {
++						delay, testErr = urltest.URLTest(testCtx, link, detour)
++					}
+ 					testChan <- urlTestResult{delay, testErr}
+ 				}()
+ 				var testResult urlTestResult

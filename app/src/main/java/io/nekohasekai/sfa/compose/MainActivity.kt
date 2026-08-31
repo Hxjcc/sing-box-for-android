@@ -1496,6 +1496,7 @@ class MainActivity :
                             viewModel = connectionsViewModel,
                             asSheet = true,
                             showTitle = true,
+                            manageVisibility = false,
                             onConnectionClick = { selectedConnectionId = it },
                             modifier = Modifier.fillMaxSize(),
                         )

@@ -12,6 +12,7 @@ import io.nekohasekai.sfa.bg.UpdateProfileWork
 import io.nekohasekai.sfa.database.Profile
 import io.nekohasekai.sfa.database.ProfileManager
 import io.nekohasekai.sfa.database.Settings
+import io.nekohasekai.sfa.database.SubscriptionUserInfo
 import io.nekohasekai.sfa.database.TypedProfile
 import io.nekohasekai.sfa.utils.HTTPClient
 import kotlinx.coroutines.Dispatchers
@@ -204,6 +205,9 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                 // Update profile object
                 profile.name = state.name
                 profile.icon = state.icon
+                if (profile.typed.remoteURL != state.remoteUrl) {
+                    profile.typed.setSubscriptionUserInfo(null)
+                }
                 profile.typed.remoteURL = state.remoteUrl
 
                 // Handle auto-update changes
@@ -255,8 +259,14 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                 var selectedProfileUpdated = false
 
                 // Fetch remote config
-                val content = HTTPClient().use { it.getString(profile.typed.remoteURL) }
+                val response = HTTPClient().use { it.getStringWithHeaders(profile.typed.remoteURL) }
+                val content = response.content
                 Libbox.checkConfig(content)
+                if (response.headers != null) {
+                    profile.typed.setSubscriptionUserInfo(
+                        SubscriptionUserInfo.parse(response.header(SubscriptionUserInfo.HEADER_NAME)),
+                    )
+                }
 
                 // Check if content changed
                 val file = File(profile.typed.path)

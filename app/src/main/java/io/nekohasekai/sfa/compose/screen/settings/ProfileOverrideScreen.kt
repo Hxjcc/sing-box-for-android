@@ -16,6 +16,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.outlined.AppShortcut
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Route
@@ -64,6 +66,8 @@ import io.nekohasekai.sfa.compose.topbar.LocalScaffoldPadding
 import io.nekohasekai.sfa.compose.topbar.OverrideTopBar
 import io.nekohasekai.sfa.constant.Status
 import io.nekohasekai.sfa.database.Settings
+import io.nekohasekai.sfa.utils.CommandTarget
+import io.nekohasekai.sfa.utils.RTTDelayTest
 import io.nekohasekai.sfa.vendor.PackageQueryManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -93,6 +97,8 @@ fun ProfileOverrideScreen(
     val scope = rememberCoroutineScope()
 
     var autoRedirect by remember { mutableStateOf(Settings.autoRedirect) }
+    var closeConnectionsOnNodeSwitch by remember { mutableStateOf(Settings.closeConnectionsOnNodeSwitch) }
+    var rttDelayTest by remember { mutableStateOf(Settings.rttDelayTest) }
     var perAppProxyEnabled by remember { mutableStateOf(Settings.perAppProxyEnabled) }
     var managedModeEnabled by remember { mutableStateOf(Settings.perAppProxyManagedMode) }
     var isScanning by remember { mutableStateOf(false) }
@@ -261,6 +267,111 @@ fun ProfileOverrideScreen(
                                     withContext(Dispatchers.Main) {
                                         notifyApplyChange(UiEvent.ApplyServiceChange.Mode.Reload)
                                     }
+                                }
+                            }
+                        },
+                    )
+                },
+                modifier = Modifier.clip(RoundedCornerShape(12.dp)),
+                colors =
+                ListItemDefaults.colors(
+                    containerColor = Color.Transparent,
+                ),
+            )
+        }
+
+        Card(
+            modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
+        ) {
+            ListItem(
+                headlineContent = {
+                    Text(
+                        stringResource(R.string.close_connections_on_node_switch),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                },
+                supportingContent = {
+                    Text(
+                        stringResource(R.string.close_connections_on_node_switch_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                },
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.LinkOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = closeConnectionsOnNodeSwitch,
+                        onCheckedChange = { checked ->
+                            closeConnectionsOnNodeSwitch = checked
+                            scope.launch(Dispatchers.IO) {
+                                Settings.closeConnectionsOnNodeSwitch = checked
+                            }
+                        },
+                    )
+                },
+                modifier = Modifier.clip(RoundedCornerShape(12.dp)),
+                colors =
+                ListItemDefaults.colors(
+                    containerColor = Color.Transparent,
+                ),
+            )
+        }
+
+        Card(
+            modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
+        ) {
+            ListItem(
+                headlineContent = {
+                    Text(
+                        stringResource(R.string.rtt_delay_test),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                },
+                supportingContent = {
+                    Text(
+                        stringResource(R.string.rtt_delay_test_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                },
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = rttDelayTest,
+                        onCheckedChange = { checked ->
+                            rttDelayTest = checked
+                            scope.launch(Dispatchers.IO) {
+                                Settings.rttDelayTest = checked
+                                if (serviceStatus == Status.Started && !CommandTarget.isRemote) {
+                                    runCatching { RTTDelayTest.syncMode(checked) }
                                 }
                             }
                         },

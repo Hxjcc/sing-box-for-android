@@ -15,8 +15,12 @@ object SettingsKey {
     const val AUTO_UPDATE_ENABLED = "auto_update_enabled"
     const val DYNAMIC_NOTIFICATION = "dynamic_notification"
     const val DISABLE_DEPRECATED_WARNINGS = "disable_deprecated_warnings"
+    const val LOG_PAUSED = "log_paused"
+    const val LOG_FILTER_LEVEL = "log_filter_level"
 
     const val AUTO_REDIRECT = "auto_redirect"
+    const val CLOSE_CONNECTIONS_ON_NODE_SWITCH = "close_connections_on_node_switch"
+    const val RTT_DELAY_TEST = "rtt_delay_test"
     const val PER_APP_PROXY_ENABLED = "per_app_proxy_enabled"
     const val PER_APP_PROXY_MODE = "per_app_proxy_mode"
     const val PER_APP_PROXY_LIST = "per_app_proxy_list"

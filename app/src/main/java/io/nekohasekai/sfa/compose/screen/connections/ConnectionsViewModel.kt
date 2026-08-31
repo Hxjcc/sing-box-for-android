@@ -15,6 +15,7 @@ import io.nekohasekai.sfa.utils.CommandClient
 import io.nekohasekai.sfa.utils.CommandTarget
 import io.nekohasekai.sfa.utils.RemoteControlManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -22,7 +23,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+
+private const val CONNECTIONS_UI_UPDATE_INTERVAL_MS = 120L
 
 data class ConnectionsUiState(
     val connections: List<Connection> = emptyList(),
@@ -57,6 +61,9 @@ class ConnectionsViewModel :
     private var connectionsStore: Connections? = null
     private val connectionsMutex = Mutex()
     private val connectionsGeneration = AtomicLong(0)
+    private val connectionsDataVersion = AtomicLong(0)
+    private val snapshotUpdateScheduled = AtomicBoolean(false)
+    private var connectionSubscribed = false
 
     override fun createInitialState() = ConnectionsUiState()
 
@@ -87,10 +94,12 @@ class ConnectionsViewModel :
                     if (state.remoteServerId != null) state.remoteConnected else state.status == Status.Started
                 val shouldConnect = state.foreground && state.screenOn &&
                     state.visibleCount > 0 && serviceReady
-                if (shouldConnect) {
-                    updateState { copy(isLoading = true) }
+                if (shouldConnect && !connectionSubscribed) {
+                    connectionSubscribed = true
+                    updateState { copy(isLoading = connections.isEmpty()) }
                     commandClient.connect()
-                } else {
+                } else if (!shouldConnect && connectionSubscribed) {
+                    connectionSubscribed = false
                     commandClient.disconnect()
                 }
             }
@@ -98,7 +107,7 @@ class ConnectionsViewModel :
     }
 
     fun setVisible(visible: Boolean) {
-        _visibleCount.value += if (visible) 1 else -1
+        _visibleCount.value = (_visibleCount.value + if (visible) 1 else -1).coerceAtLeast(0)
     }
 
     override fun onCleared() {
@@ -193,93 +202,111 @@ class ConnectionsViewModel :
     }
 
     override fun onDisconnected() {
-        viewModelScope.launch(Dispatchers.Default) {
-            connectionsMutex.withLock {
-                connectionsStore = null
-            }
-            connectionsGeneration.incrementAndGet()
-            withContext(Dispatchers.Main) {
-                updateState {
-                    copy(connections = emptyList(), allConnections = emptyList(), isLoading = false)
-                }
-            }
+        viewModelScope.launch(Dispatchers.Main) {
+            updateState { copy(isLoading = false) }
         }
     }
 
     override fun writeConnectionEvents(events: ConnectionEvents) {
         viewModelScope.launch(Dispatchers.Default) {
             val generation = connectionsGeneration.get()
-            val snapshot = connectionsMutex.withLock {
+            val applied = connectionsMutex.withLock {
+                if (connectionsGeneration.get() != generation) return@withLock false
                 if (connectionsStore == null) {
                     connectionsStore = Connections()
                 }
-                val store = connectionsStore ?: return@withLock null
+                val store = connectionsStore ?: return@withLock false
                 store.applyEvents(events)
-                buildConnectionLists(store, uiState.value)
-            } ?: return@launch
-            if (connectionsGeneration.get() != generation) {
-                return@launch
+                connectionsDataVersion.incrementAndGet()
+                true
             }
-            withContext(Dispatchers.Main) {
-                if (connectionsGeneration.get() != generation) {
-                    return@withContext
-                }
-                updateState {
-                    copy(
-                        connections = snapshot.connections,
-                        allConnections = snapshot.allConnections,
-                        isLoading = false,
-                    )
-                }
+            if (applied) {
+                scheduleConnectionSnapshot()
             }
         }
     }
 
     private fun requestConnectionsRefresh() {
+        viewModelScope.launch(Dispatchers.Default) { publishConnectionSnapshot() }
+    }
+
+    private fun scheduleConnectionSnapshot() {
+        if (!snapshotUpdateScheduled.compareAndSet(false, true)) return
+
         viewModelScope.launch(Dispatchers.Default) {
-            val generation = connectionsGeneration.get()
-            val snapshot = connectionsMutex.withLock {
-                val store = connectionsStore ?: return@withLock null
-                buildConnectionLists(store, uiState.value)
-            } ?: return@launch
-            if (connectionsGeneration.get() != generation) {
-                return@launch
-            }
-            withContext(Dispatchers.Main) {
-                if (connectionsGeneration.get() != generation) {
-                    return@withContext
+            var publishedVersion = -1L
+            var publishedGeneration = connectionsGeneration.get()
+            try {
+                do {
+                    delay(CONNECTIONS_UI_UPDATE_INTERVAL_MS)
+                    val snapshot = publishConnectionSnapshot() ?: return@launch
+                    publishedVersion = snapshot.version
+                    publishedGeneration = snapshot.generation
+                } while (
+                    connectionsGeneration.get() == publishedGeneration &&
+                    connectionsDataVersion.get() != publishedVersion
+                )
+            } finally {
+                snapshotUpdateScheduled.set(false)
+                if (
+                    publishedVersion >= 0L &&
+                    connectionsGeneration.get() == publishedGeneration &&
+                    connectionsDataVersion.get() != publishedVersion
+                ) {
+                    scheduleConnectionSnapshot()
                 }
+            }
+        }
+    }
+
+    private suspend fun publishConnectionSnapshot(): SnapshotVersion? {
+        val generation = connectionsGeneration.get()
+        val state = uiState.value
+        val snapshot = connectionsMutex.withLock {
+            if (connectionsGeneration.get() != generation) return@withLock null
+            val store = connectionsStore ?: return@withLock null
+            SnapshotVersion(
+                generation = generation,
+                version = connectionsDataVersion.get(),
+                lists = buildConnectionLists(store, state),
+            )
+        } ?: return null
+
+        if (connectionsGeneration.get() != generation) return null
+        withContext(Dispatchers.Main) {
+            if (connectionsGeneration.get() == generation) {
                 updateState {
                     copy(
-                        connections = snapshot.connections,
-                        allConnections = snapshot.allConnections,
+                        connections = snapshot.lists.connections,
+                        allConnections = snapshot.lists.allConnections,
                         isLoading = false,
                     )
                 }
             }
         }
+        return snapshot
     }
 
     private fun buildConnectionLists(
         connections: Connections,
         currentState: ConnectionsUiState,
     ): ConnectionLists {
+        connections.filterState(ConnectionStateFilter.All.libboxValue)
         val allConnectionList = connections.iterator().toList()
             .filter { it.outboundType != "dns" }
             .map { Connection.from(it) }
 
-        connections.filterState(currentState.stateFilter.libboxValue)
-
-        when (currentState.sort) {
-            ConnectionSort.ByDate -> connections.sortByDate()
-            ConnectionSort.ByTraffic -> connections.sortByTraffic()
-            ConnectionSort.ByTrafficTotal -> connections.sortByTrafficTotal()
-        }
-
-        val connectionList = connections.iterator().toList()
-            .filter { it.outboundType != "dns" }
-            .map { Connection.from(it) }
+        val connectionList = allConnectionList.asSequence()
+            .filter { connection ->
+                when (currentState.stateFilter) {
+                    ConnectionStateFilter.All -> true
+                    ConnectionStateFilter.Active -> connection.isActive
+                    ConnectionStateFilter.Closed -> !connection.isActive
+                }
+            }
             .filter { it.performSearch(currentState.searchText) }
+            .toList()
+            .let { sortConnections(it, currentState.sort) }
 
         return ConnectionLists(
             connections = connectionList,
@@ -291,4 +318,20 @@ class ConnectionsViewModel :
         val connections: List<Connection>,
         val allConnections: List<Connection>,
     )
+
+    private data class SnapshotVersion(
+        val generation: Long,
+        val version: Long,
+        val lists: ConnectionLists,
+    )
+
+    private fun sortConnections(connections: List<Connection>, sort: ConnectionSort): List<Connection> = when (sort) {
+        ConnectionSort.ByDate -> connections.sortedWith(compareByDescending<Connection> { it.createdAt }.thenByDescending { it.id })
+        ConnectionSort.ByTraffic -> connections.sortedWith(
+            compareByDescending<Connection> { it.upload + it.download }.thenByDescending { it.id },
+        )
+        ConnectionSort.ByTrafficTotal -> connections.sortedWith(
+            compareByDescending<Connection> { it.uploadTotal + it.downloadTotal }.thenByDescending { it.id },
+        )
+    }
 }

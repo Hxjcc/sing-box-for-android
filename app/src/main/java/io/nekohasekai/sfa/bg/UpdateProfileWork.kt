@@ -12,6 +12,7 @@ import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.sfa.Application
 import io.nekohasekai.sfa.database.ProfileManager
 import io.nekohasekai.sfa.database.Settings
+import io.nekohasekai.sfa.database.SubscriptionUserInfo
 import io.nekohasekai.sfa.database.TypedProfile
 import io.nekohasekai.sfa.utils.HTTPClient
 import java.io.File
@@ -75,8 +76,14 @@ class UpdateProfileWork {
                     continue
                 }
                 try {
-                    val content = HTTPClient().use { it.getString(profile.typed.remoteURL) }
+                    val response = HTTPClient().use { it.getStringWithHeaders(profile.typed.remoteURL) }
+                    val content = response.content
                     Libbox.checkConfig(content)
+                    if (response.headers != null) {
+                        profile.typed.setSubscriptionUserInfo(
+                            SubscriptionUserInfo.parse(response.header(SubscriptionUserInfo.HEADER_NAME)),
+                        )
+                    }
                     val file = File(profile.typed.path)
                     if (file.readText() != content) {
                         File(profile.typed.path).writeText(content)

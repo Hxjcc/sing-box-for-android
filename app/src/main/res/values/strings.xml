@@ -149,6 +149,7 @@
     <string name="profile_type_local">Local</string>
     <string name="profile_type_remote">Remote</string>
     <string name="profile_type_remote_updated">Remote • %s</string>
+    <string name="profile_traffic_remaining">Remaining %1$s</string>
     <string name="profile_source_create_new">Create New</string>
     <string name="profile_source_import">Import</string>
     <string name="profile_add_import_file">Import from file</string>
@@ -213,6 +214,10 @@
     <string name="android_documentation">Android Documentation</string>
     <string name="auto_redirect">Auto Redirect</string>
     <string name="auto_redirect_description">ROOT permission required</string>
+    <string name="close_connections_on_node_switch">Close connections when switching nodes</string>
+    <string name="close_connections_on_node_switch_description">Close active connections after switching</string>
+    <string name="rtt_delay_test">RTT delay test</string>
+    <string name="rtt_delay_test_description">Measure RTT using a warmed connection</string>
     <string name="system_http_proxy">System HTTP Proxy</string>
     <string name="update_settings">Update Settings</string>
 
