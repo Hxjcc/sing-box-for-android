@@ -12,11 +12,8 @@ import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.sfa.Application
 import io.nekohasekai.sfa.database.ProfileManager
 import io.nekohasekai.sfa.database.Settings
-import io.nekohasekai.sfa.database.SubscriptionUserInfo
 import io.nekohasekai.sfa.database.TypedProfile
-import io.nekohasekai.sfa.utils.HTTPClient
-import java.io.File
-import java.util.Date
+import io.nekohasekai.sfa.utils.ProfileUpdater
 import java.util.concurrent.TimeUnit
 
 class UpdateProfileWork {
@@ -76,23 +73,10 @@ class UpdateProfileWork {
                     continue
                 }
                 try {
-                    val response = HTTPClient().use { it.getStringWithHeaders(profile.typed.remoteURL) }
-                    val content = response.content
-                    Libbox.checkConfig(content)
-                    if (response.headers != null) {
-                        profile.typed.setSubscriptionUserInfo(
-                            SubscriptionUserInfo.parse(response.header(SubscriptionUserInfo.HEADER_NAME)),
-                        )
+                    val result = ProfileUpdater.update(profile)
+                    if (result.contentChanged && profile.id == selectedProfile) {
+                        selectedProfileUpdated = true
                     }
-                    val file = File(profile.typed.path)
-                    if (file.readText() != content) {
-                        File(profile.typed.path).writeText(content)
-                        if (profile.id == selectedProfile) {
-                            selectedProfileUpdated = true
-                        }
-                    }
-                    profile.typed.lastUpdated = Date()
-                    ProfileManager.update(profile)
                 } catch (e: Exception) {
                     Log.e(TAG, "update profile ${profile.name}", e)
                     success = false

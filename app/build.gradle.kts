@@ -53,6 +53,13 @@ fun getVersionProps(propName: String): String {
     return ""
 }
 
+val trafficSigningPropertiesFile = rootProject.file("traffic-signing.properties")
+val trafficSigningProperties = trafficSigningPropertiesFile.takeIf { it.exists() }?.let { file ->
+    Properties().apply {
+        FileInputStream(file).use { load(it) }
+    }
+}
+
 android {
     namespace = "io.nekohasekai.sfa"
     compileSdk = 37
@@ -83,6 +90,14 @@ android {
             keyAlias = getProps("ALIAS_NAME")
             keyPassword = getProps("ALIAS_PASS")
         }
+        if (trafficSigningProperties != null) {
+            create("traffic") {
+                storeFile = rootProject.file(trafficSigningProperties.getProperty("storeFile"))
+                storePassword = trafficSigningProperties.getProperty("storePassword")
+                keyAlias = trafficSigningProperties.getProperty("keyAlias")
+                keyPassword = trafficSigningProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -102,7 +117,11 @@ android {
             applicationIdSuffix = ".traffic"
             versionNameSuffix = "-traffic"
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (trafficSigningProperties != null) {
+                signingConfigs.getByName("traffic")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             matchingFallbacks += listOf("release")
         }
     }

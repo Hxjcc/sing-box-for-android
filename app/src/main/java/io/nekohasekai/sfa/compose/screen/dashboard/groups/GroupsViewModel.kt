@@ -43,7 +43,6 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
     private val _serviceStatus = MutableStateFlow(Status.Stopped)
     val serviceStatus = _serviceStatus.asStateFlow()
     private var lastServiceStatus: Status = Status.Stopped
-    private var syncedRTTMode: Boolean? = null
 
     init {
         if (sharedCommandClient != null) {
@@ -109,7 +108,6 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
             return
         }
         if (status != Status.Started) {
-            syncedRTTMode = null
             updateState {
                 copy(
                     groups = emptyList(),
@@ -279,7 +277,6 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
     }
 
     override fun updateGroups(newGroups: MutableList<OutboundGroup>) {
-        syncRTTModeIfNeeded()
         viewModelScope.launch(Dispatchers.Default) {
             val currentGroups = uiState.value.groups
             val currentByTag = currentGroups.associateBy { it.tag }
@@ -303,20 +300,6 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
                     )
                 }
             }
-        }
-    }
-
-    private fun syncRTTModeIfNeeded() {
-        if (CommandTarget.isRemote) return
-        val enabled = Settings.rttDelayTest
-        if (syncedRTTMode == enabled) return
-        syncedRTTMode = enabled
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching { RTTDelayTest.syncMode(enabled) }
-                .onFailure {
-                    syncedRTTMode = null
-                    sendError(it)
-                }
         }
     }
 }

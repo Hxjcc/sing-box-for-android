@@ -139,6 +139,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
                     content,
                     OverrideOptions().apply {
                         autoRedirect = Settings.autoRedirect
+                        rttDelayTest = Settings.rttDelayTest
                         if (Vendor.isPerAppProxyAvailable() && Settings.perAppProxyEnabled) {
                             val appList = Settings.getEffectivePerAppProxyList()
                             if (Settings.getEffectivePerAppProxyMode() == Settings.PER_APP_PROXY_INCLUDE) {
@@ -221,6 +222,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
                 content,
                 OverrideOptions().apply {
                     autoRedirect = Settings.autoRedirect
+                    rttDelayTest = Settings.rttDelayTest
                     if (Vendor.isPerAppProxyAvailable() && Settings.perAppProxyEnabled) {
                         val appList = Settings.getEffectivePerAppProxyList()
                         if (Settings.getEffectivePerAppProxyMode() == Settings.PER_APP_PROXY_INCLUDE) {

@@ -12,9 +12,8 @@ import io.nekohasekai.sfa.bg.UpdateProfileWork
 import io.nekohasekai.sfa.database.Profile
 import io.nekohasekai.sfa.database.ProfileManager
 import io.nekohasekai.sfa.database.Settings
-import io.nekohasekai.sfa.database.SubscriptionUserInfo
 import io.nekohasekai.sfa.database.TypedProfile
-import io.nekohasekai.sfa.utils.HTTPClient
+import io.nekohasekai.sfa.utils.ProfileUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -251,35 +250,13 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
         val profile = state.profile ?: return
 
         if (profile.typed.type != TypedProfile.Type.Remote) return
+        if (state.isUpdating || state.showUpdateSuccess) return
+
+        _uiState.update { it.copy(isUpdating = true, errorMessage = null) }
 
         viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(isUpdating = true) }
-
             try {
-                var selectedProfileUpdated = false
-
-                // Fetch remote config
-                val response = HTTPClient().use { it.getStringWithHeaders(profile.typed.remoteURL) }
-                val content = response.content
-                Libbox.checkConfig(content)
-                if (response.headers != null) {
-                    profile.typed.setSubscriptionUserInfo(
-                        SubscriptionUserInfo.parse(response.header(SubscriptionUserInfo.HEADER_NAME)),
-                    )
-                }
-
-                // Check if content changed
-                val file = File(profile.typed.path)
-                if (!file.exists() || file.readText() != content) {
-                    file.writeText(content)
-                    if (profile.id == Settings.selectedProfile) {
-                        selectedProfileUpdated = true
-                    }
-                }
-
-                // Update last updated time
-                profile.typed.lastUpdated = Date()
-                ProfileManager.update(profile)
+                val result = ProfileUpdater.update(profile)
 
                 // Update UI state with success indicator
                 _uiState.update {
@@ -291,7 +268,7 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                 }
 
                 // Reload service if needed
-                if (selectedProfileUpdated) {
+                if (result.contentChanged && profile.id == Settings.selectedProfile) {
                     try {
                         Libbox.newStandaloneCommandClient().serviceReload()
                     } catch (e: Exception) {

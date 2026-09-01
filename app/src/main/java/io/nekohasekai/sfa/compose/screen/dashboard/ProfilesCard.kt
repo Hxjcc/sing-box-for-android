@@ -369,7 +369,10 @@ fun ProfilesCard(
             onProfileSelected = { profile -> onProfileSelected(profile.id) },
             onProfileEdit = onProfileEdit,
             onProfileDelete = onProfileDelete,
+            onProfileUpdate = onProfileUpdate,
             onProfileMove = onProfileMove,
+            updatingProfileId = updatingProfileId,
+            updatedProfileId = updatedProfileId,
             onDismiss = onHideProfilePickerSheet,
         )
     }

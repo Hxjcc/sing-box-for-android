@@ -2,14 +2,13 @@ package io.nekohasekai.sfa.compose.screen.connections
 
 import androidx.lifecycle.viewModelScope
 import io.nekohasekai.libbox.ConnectionEvents
-import io.nekohasekai.libbox.Connections
+import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.sfa.compose.base.BaseViewModel
 import io.nekohasekai.sfa.compose.base.ScreenEvent
 import io.nekohasekai.sfa.compose.model.Connection
 import io.nekohasekai.sfa.compose.model.ConnectionSort
 import io.nekohasekai.sfa.compose.model.ConnectionStateFilter
 import io.nekohasekai.sfa.constant.Status
-import io.nekohasekai.sfa.ktx.toList
 import io.nekohasekai.sfa.utils.AppLifecycleObserver
 import io.nekohasekai.sfa.utils.CommandClient
 import io.nekohasekai.sfa.utils.CommandTarget
@@ -26,7 +25,12 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
-private const val CONNECTIONS_UI_UPDATE_INTERVAL_MS = 120L
+private const val CONNECTIONS_UI_UPDATE_INTERVAL_SMALL_MS = 120L
+private const val CONNECTIONS_UI_UPDATE_INTERVAL_MEDIUM_MS = 220L
+private const val CONNECTIONS_UI_UPDATE_INTERVAL_LARGE_MS = 400L
+private const val CONNECTIONS_MEDIUM_LIST_SIZE = 300
+private const val CONNECTIONS_LARGE_LIST_SIZE = 1_000
+private const val CLOSED_CONNECTION_MAX_AGE_MS = 5L * 60L * 1_000L
 
 data class ConnectionsUiState(
     val connections: List<Connection> = emptyList(),
@@ -58,7 +62,7 @@ class ConnectionsViewModel :
 
     private val _visibleCount = MutableStateFlow(0)
 
-    private var connectionsStore: Connections? = null
+    private val connectionsStore = mutableMapOf<String, Connection>()
     private val connectionsMutex = Mutex()
     private val connectionsGeneration = AtomicLong(0)
     private val connectionsDataVersion = AtomicLong(0)
@@ -122,7 +126,7 @@ class ConnectionsViewModel :
         if (status != Status.Started) {
             withContext(Dispatchers.Default) {
                 connectionsMutex.withLock {
-                    connectionsStore = null
+                    connectionsStore.clear()
                 }
                 connectionsGeneration.incrementAndGet()
             }
@@ -212,11 +216,7 @@ class ConnectionsViewModel :
             val generation = connectionsGeneration.get()
             val applied = connectionsMutex.withLock {
                 if (connectionsGeneration.get() != generation) return@withLock false
-                if (connectionsStore == null) {
-                    connectionsStore = Connections()
-                }
-                val store = connectionsStore ?: return@withLock false
-                store.applyEvents(events)
+                applyConnectionEvents(events)
                 connectionsDataVersion.incrementAndGet()
                 true
             }
@@ -238,7 +238,7 @@ class ConnectionsViewModel :
             var publishedGeneration = connectionsGeneration.get()
             try {
                 do {
-                    delay(CONNECTIONS_UI_UPDATE_INTERVAL_MS)
+                    delay(connectionUpdateInterval(uiState.value.allConnections.size))
                     val snapshot = publishConnectionSnapshot() ?: return@launch
                     publishedVersion = snapshot.version
                     publishedGeneration = snapshot.generation
@@ -262,15 +262,19 @@ class ConnectionsViewModel :
     private suspend fun publishConnectionSnapshot(): SnapshotVersion? {
         val generation = connectionsGeneration.get()
         val state = uiState.value
-        val snapshot = connectionsMutex.withLock {
+        val rawSnapshot = connectionsMutex.withLock {
             if (connectionsGeneration.get() != generation) return@withLock null
-            val store = connectionsStore ?: return@withLock null
-            SnapshotVersion(
-                generation = generation,
+            RawSnapshot(
                 version = connectionsDataVersion.get(),
-                lists = buildConnectionLists(store, state),
+                connections = connectionsStore.values.toList(),
             )
         } ?: return null
+
+        val snapshot = SnapshotVersion(
+            generation = generation,
+            version = rawSnapshot.version,
+            lists = buildConnectionLists(rawSnapshot.connections, state),
+        )
 
         if (connectionsGeneration.get() != generation) return null
         withContext(Dispatchers.Main) {
@@ -288,14 +292,9 @@ class ConnectionsViewModel :
     }
 
     private fun buildConnectionLists(
-        connections: Connections,
+        allConnectionList: List<Connection>,
         currentState: ConnectionsUiState,
     ): ConnectionLists {
-        connections.filterState(ConnectionStateFilter.All.libboxValue)
-        val allConnectionList = connections.iterator().toList()
-            .filter { it.outboundType != "dns" }
-            .map { Connection.from(it) }
-
         val connectionList = allConnectionList.asSequence()
             .filter { connection ->
                 when (currentState.stateFilter) {
@@ -324,6 +323,78 @@ class ConnectionsViewModel :
         val version: Long,
         val lists: ConnectionLists,
     )
+
+    private data class RawSnapshot(
+        val version: Long,
+        val connections: List<Connection>,
+    )
+
+    private fun applyConnectionEvents(events: ConnectionEvents) {
+        if (events.reset) {
+            connectionsStore.clear()
+        }
+
+        val iterator = events.iterator()
+        while (iterator.hasNext()) {
+            val event = iterator.next()
+            val connectionId = event.id
+            when (event.type) {
+                Libbox.ConnectionEventNew.toInt() -> {
+                    event.connection?.let { connection ->
+                        val converted = Connection.from(connection)
+                        if (converted.outboundType == "dns") {
+                            connectionsStore.remove(connectionId)
+                        } else {
+                            connectionsStore[connectionId] = converted
+                        }
+                    }
+                }
+                Libbox.ConnectionEventUpdate.toInt() -> {
+                    connectionsStore[connectionId]?.let { connection ->
+                        connectionsStore[connectionId] = connection.copy(
+                            upload = event.uplinkDelta,
+                            download = event.downlinkDelta,
+                            uploadTotal = connection.uploadTotal + event.uplinkDelta,
+                            downloadTotal = connection.downloadTotal + event.downlinkDelta,
+                        )
+                    }
+                }
+                Libbox.ConnectionEventClosed.toInt() -> {
+                    val closedConnection = event.connection?.let { Connection.from(it) }
+                    if (closedConnection != null) {
+                        if (closedConnection.outboundType == "dns") {
+                            connectionsStore.remove(connectionId)
+                        } else {
+                            connectionsStore[connectionId] = closedConnection.copy(
+                                closedAt = event.closedAt.takeIf { it > 0L } ?: closedConnection.closedAt,
+                                upload = 0L,
+                                download = 0L,
+                            )
+                        }
+                    } else {
+                        connectionsStore[connectionId]?.let { connection ->
+                            connectionsStore[connectionId] = connection.copy(
+                                closedAt = event.closedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
+                                upload = 0L,
+                                download = 0L,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        val oldestRetainedTime = System.currentTimeMillis() - CLOSED_CONNECTION_MAX_AGE_MS
+        connectionsStore.entries.removeAll { (_, connection) ->
+            connection.closedAt?.let { it < oldestRetainedTime } == true
+        }
+    }
+
+    private fun connectionUpdateInterval(connectionCount: Int): Long = when {
+        connectionCount >= CONNECTIONS_LARGE_LIST_SIZE -> CONNECTIONS_UI_UPDATE_INTERVAL_LARGE_MS
+        connectionCount >= CONNECTIONS_MEDIUM_LIST_SIZE -> CONNECTIONS_UI_UPDATE_INTERVAL_MEDIUM_MS
+        else -> CONNECTIONS_UI_UPDATE_INTERVAL_SMALL_MS
+    }
 
     private fun sortConnections(connections: List<Connection>, sort: ConnectionSort): List<Connection> = when (sort) {
         ConnectionSort.ByDate -> connections.sortedWith(compareByDescending<Connection> { it.createdAt }.thenByDescending { it.id })

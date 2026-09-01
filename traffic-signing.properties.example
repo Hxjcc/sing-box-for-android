@@ -1,0 +1,5 @@
+# Copy this file to traffic-signing.properties and keep the real file private.
+storeFile=config/signing/traffic.keystore
+storePassword=replace-with-a-private-password
+keyAlias=traffic
+keyPassword=replace-with-a-private-password

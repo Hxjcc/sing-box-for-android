@@ -3,8 +3,15 @@ package io.nekohasekai.sfa.compose.screen.dashboard
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -32,7 +40,9 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -66,6 +76,7 @@ import io.nekohasekai.sfa.compose.util.ProfileIcons
 import io.nekohasekai.sfa.compose.util.QRCodeGenerator
 import io.nekohasekai.sfa.compose.util.RelativeTimeFormatter
 import io.nekohasekai.sfa.database.Profile
+import io.nekohasekai.sfa.database.SubscriptionUserInfo
 import io.nekohasekai.sfa.database.TypedProfile
 import io.nekohasekai.sfa.ktx.shareProfile
 import kotlinx.coroutines.Dispatchers
@@ -82,7 +93,10 @@ fun ProfilePickerSheet(
     onProfileSelected: (Profile) -> Unit,
     onProfileEdit: (Profile) -> Unit,
     onProfileDelete: (Profile) -> Unit,
+    onProfileUpdate: (Profile) -> Unit,
     onProfileMove: (Int, Int) -> Unit,
+    updatingProfileId: Long? = null,
+    updatedProfileId: Long? = null,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -138,6 +152,9 @@ fun ProfilePickerSheet(
                             profile = profile,
                             isSelected = profile.id == selectedProfileId,
                             isDragging = isDragging,
+                            isUpdating = profile.id == updatingProfileId,
+                            showUpdateSuccess = profile.id == updatedProfileId,
+                            updateEnabled = updatingProfileId == null && updatedProfileId == null,
                             onSelect = {
                                 onProfileSelected(profile)
                                 onDismiss()
@@ -151,6 +168,7 @@ fun ProfilePickerSheet(
                                     }
                                 }
                             },
+                            onUpdate = { onProfileUpdate(profile) },
                             onShareURL = {
                                 qrCodeProfile = profile
                                 showQRCodeDialog = true
@@ -210,8 +228,12 @@ private fun ProfilePickerRow(
     profile: Profile,
     isSelected: Boolean,
     isDragging: Boolean,
+    isUpdating: Boolean,
+    showUpdateSuccess: Boolean,
+    updateEnabled: Boolean,
     onSelect: () -> Unit,
     onEdit: () -> Unit,
+    onUpdate: () -> Unit,
     onShare: () -> Unit,
     onShareURL: () -> Unit,
     onDelete: () -> Unit,
@@ -221,6 +243,8 @@ private fun ProfilePickerRow(
     var expandedShareSubmenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val isDarkTheme = isSystemInDarkTheme()
+    val subscriptionUserInfo = profile.typed.subscriptionUserInfo
 
     val animatedElevation by animateFloatAsState(
         targetValue = when {
@@ -268,7 +292,7 @@ private fun ProfilePickerRow(
         shape = RoundedCornerShape(8.dp),
         color = when {
             isDragging -> MaterialTheme.colorScheme.tertiaryContainer
-            isSelected -> if (isSystemInDarkTheme()) {
+            isSelected -> if (isDarkTheme) {
                 lerp(
                     MaterialTheme.colorScheme.surfaceContainerLow,
                     MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -277,7 +301,7 @@ private fun ProfilePickerRow(
             } else {
                 MaterialTheme.colorScheme.surfaceDim
             }
-            else -> if (isSystemInDarkTheme()) {
+            else -> if (isDarkTheme) {
                 lerp(
                     MaterialTheme.colorScheme.surfaceContainerLow,
                     MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -289,202 +313,294 @@ private fun ProfilePickerRow(
         },
         tonalElevation = animatedElevation.dp,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val profileIcon =
-                ProfileIcons.getIconById(profile.icon)
-                    ?: Icons.AutoMirrored.Default.InsertDriveFile
-
-            Icon(
-                imageVector = profileIcon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        Box(modifier = Modifier.fillMaxWidth()) {
+            ProfileTrafficProgressFill(
+                userInfo = subscriptionUserInfo,
+                remainingFraction = subscriptionUserInfo?.remainingFraction ?: 0f,
+                isDarkTheme = isDarkTheme,
+                modifier = Modifier.matchParentSize(),
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = profile.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                val profileIcon =
+                    ProfileIcons.getIconById(profile.icon)
+                        ?: Icons.AutoMirrored.Default.InsertDriveFile
+
+                Icon(
+                    imageVector = profileIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                Text(
-                    text = when (profile.typed.type) {
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = profile.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+
+                    val profileDescription = when (profile.typed.type) {
                         TypedProfile.Type.Local -> stringResource(R.string.profile_type_local)
                         TypedProfile.Type.Remote -> stringResource(
                             R.string.profile_type_remote_updated,
                             RelativeTimeFormatter.format(context, profile.typed.lastUpdated),
                         )
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                )
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                } else {
-                    Spacer(modifier = Modifier.size(24.dp))
-                }
-
-                Box {
-                    IconButton(
-                        onClick = {
-                            showMenu = true
-                            expandedShareSubmenu = false
-                        },
-                        modifier = Modifier.size(32.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = stringResource(R.string.more_options),
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    }
+                    val trafficDescription = subscriptionUserInfo?.let {
+                        stringResource(
+                            R.string.profile_traffic_remaining,
+                            SubscriptionUserInfo.formatBytes(it.remaining),
                         )
                     }
+                    Text(
+                        text = listOfNotNull(profileDescription, trafficDescription).joinToString(" · "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
 
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = {
-                            showMenu = false
-                            expandedShareSubmenu = false
-                        },
-                        modifier = Modifier.widthIn(min = 200.dp),
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.edit)) },
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (isSelected) {
+                        Box(
+                            modifier = Modifier.size(32.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    } else if (profile.typed.type == TypedProfile.Type.Remote) {
+                        IconButton(
+                            onClick = onUpdate,
+                            enabled = updateEnabled && !showUpdateSuccess,
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            ProfileUpdateStatusIcon(
+                                isUpdating = isUpdating,
+                                showSuccess = showUpdateSuccess,
+                                enabled = updateEnabled,
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(32.dp))
+                    }
+
+                    Box {
+                        IconButton(
                             onClick = {
+                                showMenu = true
+                                expandedShareSubmenu = false
+                            },
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.more_options),
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = {
                                 showMenu = false
-                                onEdit()
+                                expandedShareSubmenu = false
                             },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            },
-                        )
-
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.menu_share)) },
-                            onClick = {
-                                expandedShareSubmenu = !expandedShareSubmenu
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.IosShare,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            },
-                            trailingIcon = {
-                                Icon(
-                                    imageVector = if (expandedShareSubmenu) {
-                                        Icons.Default.ExpandLess
-                                    } else {
-                                        Icons.Default.ExpandMore
-                                    },
-                                    contentDescription = null,
-                                )
-                            },
-                        )
-
-                        if (expandedShareSubmenu) {
+                            modifier = Modifier.widthIn(min = 200.dp),
+                        ) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.save_as_file)) },
+                                text = { Text(stringResource(R.string.edit)) },
                                 onClick = {
                                     showMenu = false
-                                    saveFileLauncher.launch("${profile.name}.bpf")
+                                    onEdit()
                                 },
                                 leadingIcon = {
                                     Icon(
-                                        imageVector = Icons.Default.Save,
+                                        imageVector = Icons.Default.Edit,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(start = 24.dp),
                                     )
                                 },
                             )
 
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.share_as_file)) },
+                                text = { Text(stringResource(R.string.menu_share)) },
                                 onClick = {
-                                    showMenu = false
-                                    onShare()
+                                    expandedShareSubmenu = !expandedShareSubmenu
                                 },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.IosShare,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(start = 24.dp),
+                                    )
+                                },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = if (expandedShareSubmenu) {
+                                            Icons.Default.ExpandLess
+                                        } else {
+                                            Icons.Default.ExpandMore
+                                        },
+                                        contentDescription = null,
                                     )
                                 },
                             )
 
-                            if (profile.typed.type == TypedProfile.Type.Remote) {
+                            if (expandedShareSubmenu) {
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.profile_share_url)) },
+                                    text = { Text(stringResource(R.string.save_as_file)) },
                                     onClick = {
                                         showMenu = false
-                                        onShareURL()
+                                        saveFileLauncher.launch("${profile.name}.bpf")
                                     },
                                     leadingIcon = {
                                         Icon(
-                                            imageVector = Icons.Default.QrCode2,
+                                            imageVector = Icons.Default.Save,
                                             contentDescription = null,
                                             tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.padding(start = 24.dp),
                                         )
                                     },
                                 )
-                            }
-                        }
 
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(R.string.menu_delete),
-                                    color = MaterialTheme.colorScheme.error,
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.share_as_file)) },
+                                    onClick = {
+                                        showMenu = false
+                                        onShare()
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.IosShare,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(start = 24.dp),
+                                        )
+                                    },
                                 )
-                            },
-                            onClick = {
-                                showMenu = false
-                                onDelete()
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                )
-                            },
-                        )
+
+                                if (profile.typed.type == TypedProfile.Type.Remote) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.profile_share_url)) },
+                                        onClick = {
+                                            showMenu = false
+                                            onShareURL()
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.QrCode2,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(start = 24.dp),
+                                            )
+                                        },
+                                    )
+                                }
+                            }
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(R.string.menu_delete),
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    onDelete()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ProfileUpdateStatusIcon(
+    isUpdating: Boolean,
+    showSuccess: Boolean,
+    enabled: Boolean,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        AnimatedVisibility(
+            visible = isUpdating,
+            enter = fadeIn(animationSpec = tween(120)) + scaleIn(initialScale = 0.8f),
+            exit = fadeOut(animationSpec = tween(100)) + scaleOut(targetScale = 0.8f),
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+            )
+        }
+        AnimatedVisibility(
+            visible = showSuccess,
+            enter = fadeIn(animationSpec = tween(120)) + scaleIn(
+                initialScale = 0.45f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+            ),
+            exit = fadeOut(animationSpec = tween(120)) + scaleOut(targetScale = 0.75f),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = stringResource(R.string.update_profile),
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+        AnimatedVisibility(
+            visible = !isUpdating && !showSuccess,
+            enter = fadeIn(animationSpec = tween(140)),
+            exit = fadeOut(animationSpec = tween(100)),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = stringResource(R.string.update_profile),
+                modifier = Modifier.size(20.dp),
+                tint = if (enabled) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                },
+            )
         }
     }
 }

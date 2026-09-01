@@ -11,12 +11,11 @@ import io.nekohasekai.sfa.constant.Status
 import io.nekohasekai.sfa.database.Profile
 import io.nekohasekai.sfa.database.ProfileManager
 import io.nekohasekai.sfa.database.Settings
-import io.nekohasekai.sfa.database.SubscriptionUserInfo
 import io.nekohasekai.sfa.database.TypedProfile
 import io.nekohasekai.sfa.utils.AppLifecycleObserver
 import io.nekohasekai.sfa.utils.CommandClient
 import io.nekohasekai.sfa.utils.CommandTarget
-import io.nekohasekai.sfa.utils.HTTPClient
+import io.nekohasekai.sfa.utils.ProfileUpdater
 import io.nekohasekai.sfa.utils.RemoteControlManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -29,9 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
-import java.io.File
 import java.util.Collections
-import java.util.Date
 
 enum class CardGroup {
     ClashMode,
@@ -356,61 +353,51 @@ class DashboardViewModel :
 
     fun updateProfile(profile: Profile) {
         if (profile.typed.type != TypedProfile.Type.Remote) return
+        if (currentState.updatingProfileId != null || currentState.updatedProfileId != null) return
+
+        updateState {
+            copy(
+                updatingProfileId = profile.id,
+                updatedProfileId = null,
+            )
+        }
 
         viewModelScope.launch(Dispatchers.IO) {
-            // Set updating state
-            withContext(Dispatchers.Main) {
-                updateState { copy(updatingProfileId = profile.id) }
-            }
-
             try {
-                // Fetch remote config
-                val response = HTTPClient().use { it.getStringWithHeaders(profile.typed.remoteURL) }
-                val content = response.content
-                Libbox.checkConfig(content)
-                if (response.headers != null) {
-                    profile.typed.setSubscriptionUserInfo(
-                        SubscriptionUserInfo.parse(response.header(SubscriptionUserInfo.HEADER_NAME)),
-                    )
-                }
+                val result = ProfileUpdater.update(profile)
 
-                // Check if content changed
-                val file = File(profile.typed.path)
-                var contentChanged = false
-                if (!file.exists() || file.readText() != content) {
-                    file.writeText(content)
-                    contentChanged = true
-                }
-
-                // Update last updated time
-                profile.typed.lastUpdated = Date()
-                ProfileManager.update(profile)
-
-                // Reload profiles
                 loadProfiles()
 
-                // Show success state
                 withContext(Dispatchers.Main) {
                     updateState { copy(updatingProfileId = null, updatedProfileId = profile.id) }
                 }
 
-                // Clear success state after delay
-                withContext(Dispatchers.Main) {
-                    delay(1500)
-                    updateState { copy(updatedProfileId = null) }
-                }
-
-                // Restart service if this is the selected profile and content changed
-                if (contentChanged && profile.id == Settings.selectedProfile) {
+                if (result.contentChanged && profile.id == Settings.selectedProfile) {
                     withContext(Dispatchers.Main) {
                         sendGlobalEvent(UiEvent.RequestReconnectService)
                     }
                 }
+
+                delay(1500)
+                withContext(Dispatchers.Main) {
+                    updateState {
+                        if (updatedProfileId == profile.id) {
+                            copy(updatedProfileId = null)
+                        } else {
+                            this
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 sendErrorMessage("Failed to update profile: ${e.message}")
-                // Clear updating state on error
                 withContext(Dispatchers.Main) {
-                    updateState { copy(updatingProfileId = null) }
+                    updateState {
+                        if (updatingProfileId == profile.id) {
+                            copy(updatingProfileId = null, updatedProfileId = null)
+                        } else {
+                            this
+                        }
+                    }
                 }
             }
         }

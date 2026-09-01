@@ -4,13 +4,12 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -145,16 +145,35 @@ private fun ProfileTrafficFill(
         )
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxHeight()
-            .fillMaxWidth(animatedFraction.value)
-            .background(
-                MaterialTheme.colorScheme.primaryContainer.copy(
-                    alpha = if (isDarkTheme) 0.45f else 0.7f,
-                ),
-            ),
+    ProfileTrafficProgressFill(
+        userInfo = userInfo,
+        remainingFraction = animatedFraction.value,
+        isDarkTheme = isDarkTheme,
+        modifier = Modifier.fillMaxSize(),
     )
+}
+
+@Composable
+internal fun ProfileTrafficProgressFill(
+    userInfo: SubscriptionUserInfo?,
+    remainingFraction: Float,
+    isDarkTheme: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (userInfo == null) return
+
+    val fillColor = MaterialTheme.colorScheme.primaryContainer.copy(
+        alpha = if (isDarkTheme) 0.45f else 0.7f,
+    )
+    Canvas(modifier = modifier) {
+        drawRect(
+            color = fillColor,
+            size = Size(
+                width = size.width * remainingFraction.coerceIn(0f, 1f),
+                height = size.height,
+            ),
+        )
+    }
 }
 
 @Composable

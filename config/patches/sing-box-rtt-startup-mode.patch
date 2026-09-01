@@ -1,0 +1,36 @@
+diff --git a/daemon/instance.go b/daemon/instance.go
+--- a/daemon/instance.go
++++ b/daemon/instance.go
+@@ -73,11 +73,13 @@ func (s *StartedService) FormatConfig(ctx context.Context, configContent string)
+ 
+ type OverrideOptions struct {
+ 	AutoRedirect   bool
++	RTTDelayTest   bool
+ 	IncludePackage []string
+ 	ExcludePackage []string
+ }
+ 
+ func (s *StartedService) newInstance(ctx context.Context, profileContent string, overrideOptions *OverrideOptions) (*Instance, error) {
++	urltest.SetRTTEnabled(overrideOptions != nil && overrideOptions.RTTDelayTest)
+ 	selectedLocale := locale.FromContext(ctx)
+ 	ctx, _ = locale.ContextWithLocale(s.ctx, selectedLocale.Locale)
+ 	ctx = service.ExtendContext(ctx)
+diff --git a/experimental/libbox/command_server.go b/experimental/libbox/command_server.go
+--- a/experimental/libbox/command_server.go
++++ b/experimental/libbox/command_server.go
+@@ -200,6 +200,7 @@ func (s *CommandServer) Close() {
+ 
+ type OverrideOptions struct {
+ 	AutoRedirect   bool
++	RTTDelayTest   bool
+ 	IncludePackage StringIterator
+ 	ExcludePackage StringIterator
+ }
+@@ -211,6 +212,7 @@ func (s *CommandServer) StartOrReloadService(configContent string, options *Over
+ 	}
+ 	err := s.StartedService.StartOrReloadService(s.ctx, configContent, &daemon.OverrideOptions{
+ 		AutoRedirect:   options.AutoRedirect,
++		RTTDelayTest:   options.RTTDelayTest,
+ 		IncludePackage: iteratorToArray(options.IncludePackage),
+ 		ExcludePackage: iteratorToArray(options.ExcludePackage),
+ 	})
