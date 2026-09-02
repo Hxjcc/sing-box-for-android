@@ -77,8 +77,15 @@ if ([string]::IsNullOrWhiteSpace($env:GOSUMDB) -or $env:GOSUMDB -eq "off") {
 }
 $env:PATH = "$javaHomePath\bin;$goBinPath;$(Join-Path $goPath 'bin');$env:PATH"
 
-git clone --depth 1 --branch v1.14.0 https://github.com/SagerNet/sing-box.git $sourceDirectory
-if ($LASTEXITCODE -ne 0) { throw "Unable to clone sing-box v1.14.0" }
+$coreCommit = "5ee65a5ca9e6a448a5fa2f47b55b51fe2fcf578d"
+git init $sourceDirectory
+if ($LASTEXITCODE -ne 0) { throw "Unable to initialize the sing-box source tree" }
+git -C $sourceDirectory remote add origin https://github.com/SagerNet/sing-box.git
+if ($LASTEXITCODE -ne 0) { throw "Unable to configure the sing-box source remote" }
+git -C $sourceDirectory fetch --depth 1 origin $coreCommit
+if ($LASTEXITCODE -ne 0) { throw "Unable to fetch sing-box core $coreCommit" }
+git -C $sourceDirectory checkout --detach FETCH_HEAD
+if ($LASTEXITCODE -ne 0) { throw "Unable to check out sing-box core $coreCommit" }
 
 $patches = @(
     "sing-box-rtt-delay-test.patch",
