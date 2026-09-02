@@ -29,7 +29,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +56,7 @@ private object ProfileTrafficAnimationTracker {
             userInfo.upload,
             userInfo.download,
             userInfo.total,
+            userInfo.expire,
             profile.typed.lastUpdated.time,
         ).joinToString(":")
         val previousVersion = profileVersions.put(profile.id, version)
@@ -72,7 +75,7 @@ fun ProfileSelectorButton(selectedProfile: Profile?, onClick: () -> Unit, modifi
     val remainingFraction = subscriptionUserInfo?.remainingFraction ?: 0f
     val trafficAnimationKey = if (selectedProfile != null && subscriptionUserInfo != null) {
         "${selectedProfile.id}:${subscriptionUserInfo.upload}:${subscriptionUserInfo.download}:" +
-            "${subscriptionUserInfo.total}:${selectedProfile.typed.lastUpdated.time}"
+            "${subscriptionUserInfo.total}:${subscriptionUserInfo.expire}:${selectedProfile.typed.lastUpdated.time}"
     } else {
         null
     }
@@ -166,12 +169,30 @@ internal fun ProfileTrafficProgressFill(
         alpha = if (isDarkTheme) 0.45f else 0.7f,
     )
     Canvas(modifier = modifier) {
+        val fraction = remainingFraction.coerceIn(0f, 1f)
+        val fillWidth = size.width * fraction
+        if (fillWidth <= 0f) return@Canvas
+        if (fraction >= 0.995f) {
+            drawRect(color = fillColor)
+            return@Canvas
+        }
+
+        val fadeWidth = minOf(18.dp.toPx(), fillWidth)
+        val solidWidth = (fillWidth - fadeWidth).coerceAtLeast(0f)
+        if (solidWidth > 0f) {
+            drawRect(
+                color = fillColor,
+                size = Size(width = solidWidth, height = size.height),
+            )
+        }
         drawRect(
-            color = fillColor,
-            size = Size(
-                width = size.width * remainingFraction.coerceIn(0f, 1f),
-                height = size.height,
+            brush = Brush.horizontalGradient(
+                colors = listOf(fillColor, fillColor.copy(alpha = 0f)),
+                startX = solidWidth,
+                endX = fillWidth,
             ),
+            topLeft = Offset(x = solidWidth, y = 0f),
+            size = Size(width = fadeWidth, height = size.height),
         )
     }
 }

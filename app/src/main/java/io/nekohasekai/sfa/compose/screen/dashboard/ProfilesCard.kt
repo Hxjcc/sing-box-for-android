@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DataObject
@@ -80,6 +81,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.text.DateFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,12 +93,15 @@ fun ProfilesCard(
     showProfilePickerSheet: Boolean,
     updatingProfileId: Long? = null,
     updatedProfileId: Long? = null,
+    isUpdatingAllProfiles: Boolean = false,
+    showUpdateAllSuccess: Boolean = false,
     onProfileSelected: (Long) -> Unit,
     onProfileEdit: (Profile) -> Unit,
     onProfileDelete: (Profile) -> Unit,
     onProfileShare: (Profile) -> Unit,
     onProfileShareURL: (Profile) -> Unit,
     onProfileUpdate: (Profile) -> Unit,
+    onProfileUpdateAll: () -> Unit,
     onProfileMove: (Int, Int) -> Unit,
     onShowAddProfileSheet: () -> Unit,
     onHideAddProfileSheet: () -> Unit,
@@ -293,8 +298,8 @@ fun ProfilesCard(
 
                 ProfileActionRow(
                     profile = selectedProfile,
-                    isUpdating = selectedProfile?.id == updatingProfileId,
-                    showUpdateSuccess = selectedProfile?.id == updatedProfileId,
+                    isUpdating = selectedProfile?.id == updatingProfileId || isUpdatingAllProfiles,
+                    showUpdateSuccess = selectedProfile?.id == updatedProfileId || showUpdateAllSuccess,
                     onEdit = { selectedProfile?.let { onProfileEdit(it) } },
                     onUpdate = { selectedProfile?.let { onProfileUpdate(it) } },
                     onShareFile = {
@@ -373,6 +378,9 @@ fun ProfilesCard(
             onProfileMove = onProfileMove,
             updatingProfileId = updatingProfileId,
             updatedProfileId = updatedProfileId,
+            isUpdatingAllProfiles = isUpdatingAllProfiles,
+            showUpdateAllSuccess = showUpdateAllSuccess,
+            onUpdateAll = onProfileUpdateAll,
             onDismiss = onHideProfilePickerSheet,
         )
     }
@@ -647,48 +655,74 @@ private fun ProfileInfoRow(profile: Profile?) {
 
     val context = LocalContext.current
 
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Icon(
-                imageVector = if (profile.typed.type == TypedProfile.Type.Remote) {
-                    Icons.Default.Cloud
-                } else {
-                    Icons.Outlined.Description
-                },
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = if (profile.typed.type == TypedProfile.Type.Remote) {
-                    stringResource(R.string.profile_type_remote)
-                } else {
-                    stringResource(R.string.profile_type_local)
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        if (profile.typed.type == TypedProfile.Type.Remote) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Default.AccessTime,
+                    imageVector = if (profile.typed.type == TypedProfile.Type.Remote) {
+                        Icons.Default.Cloud
+                    } else {
+                        Icons.Outlined.Description
+                    },
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = RelativeTimeFormatter.format(context, profile.typed.lastUpdated),
+                    text = if (profile.typed.type == TypedProfile.Type.Remote) {
+                        stringResource(R.string.profile_type_remote)
+                    } else {
+                        stringResource(R.string.profile_type_local)
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (profile.typed.type == TypedProfile.Type.Remote) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccessTime,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = RelativeTimeFormatter.format(context, profile.typed.lastUpdated),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        profile.typed.subscriptionUserInfo?.expireAt?.let { expireAt ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.profile_traffic_expires,
+                        DateFormat.getDateInstance(DateFormat.MEDIUM).format(expireAt),
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -715,7 +749,7 @@ private fun ProfileActionRow(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
     ) {
         ActionButton(
             icon = Icons.Default.Edit,

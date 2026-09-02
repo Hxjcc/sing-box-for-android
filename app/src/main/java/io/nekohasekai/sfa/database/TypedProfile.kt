@@ -42,6 +42,7 @@ class TypedProfile() : Parcelable {
     var subscriptionUpload: Long = UNKNOWN_SUBSCRIPTION_TRAFFIC
     var subscriptionDownload: Long = UNKNOWN_SUBSCRIPTION_TRAFFIC
     var subscriptionTotal: Long = UNKNOWN_SUBSCRIPTION_TRAFFIC
+    var subscriptionExpire: Long = UNKNOWN_SUBSCRIPTION_EXPIRE
 
     val subscriptionUserInfo: SubscriptionUserInfo?
         get() {
@@ -50,6 +51,7 @@ class TypedProfile() : Parcelable {
                 upload = subscriptionUpload,
                 download = subscriptionDownload,
                 total = subscriptionTotal,
+                expire = subscriptionExpire.takeIf { it > 0L },
             )
         }
 
@@ -57,6 +59,7 @@ class TypedProfile() : Parcelable {
         subscriptionUpload = userInfo?.upload ?: UNKNOWN_SUBSCRIPTION_TRAFFIC
         subscriptionDownload = userInfo?.download ?: UNKNOWN_SUBSCRIPTION_TRAFFIC
         subscriptionTotal = userInfo?.total ?: UNKNOWN_SUBSCRIPTION_TRAFFIC
+        subscriptionExpire = userInfo?.expire ?: UNKNOWN_SUBSCRIPTION_EXPIRE
     }
 
     constructor(reader: Parcel) : this() {
@@ -74,10 +77,13 @@ class TypedProfile() : Parcelable {
             subscriptionDownload = reader.readLong()
             subscriptionTotal = reader.readLong()
         }
+        if (version >= 3) {
+            subscriptionExpire = reader.readLong()
+        }
     }
 
     override fun writeToParcel(writer: Parcel, flags: Int) {
-        writer.writeInt(2)
+        writer.writeInt(3)
         writer.writeString(path)
         writer.writeInt(type.ordinal)
         writer.writeString(remoteURL)
@@ -87,12 +93,14 @@ class TypedProfile() : Parcelable {
         writer.writeLong(subscriptionUpload)
         writer.writeLong(subscriptionDownload)
         writer.writeLong(subscriptionTotal)
+        writer.writeLong(subscriptionExpire)
     }
 
     override fun describeContents(): Int = 0
 
     companion object CREATOR : Parcelable.Creator<TypedProfile> {
         private const val UNKNOWN_SUBSCRIPTION_TRAFFIC = -1L
+        private const val UNKNOWN_SUBSCRIPTION_EXPIRE = -1L
 
         override fun createFromParcel(parcel: Parcel): TypedProfile = TypedProfile(parcel)
 

@@ -128,6 +128,7 @@
     <string name="no_profiles">尚未設定任何設定檔</string>
     <string name="add_profile">新增設定檔</string>
     <string name="update_profile">更新設定檔</string>
+    <string name="update_all_profiles">更新全部設定檔</string>
     <string name="import_remote_profile">匯入遠端設定</string>
     <string name="import_remote_profile_message">您確定要匯入遠端設定檔 %1$s 嗎？您將連線到 %2$s 以下載設定。</string>
     <string name="import_from_file_description">從本機檔案匯入設定</string>
@@ -150,6 +151,7 @@
     <string name="profile_type_remote">遠端</string>
     <string name="profile_type_remote_updated">遠端 • %s</string>
     <string name="profile_traffic_remaining">剩餘 %1$s</string>
+    <string name="profile_traffic_expires">到期：%1$s</string>
     <string name="profile_source_create_new">建立新項目</string>
     <string name="profile_source_import">匯入</string>
     <string name="profile_add_import_file">從檔案匯入</string>

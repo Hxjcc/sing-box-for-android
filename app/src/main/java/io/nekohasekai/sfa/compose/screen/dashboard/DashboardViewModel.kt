@@ -61,6 +61,8 @@ data class DashboardUiState(
     val showProfilePickerSheet: Boolean = false,
     val updatingProfileId: Long? = null,
     val updatedProfileId: Long? = null,
+    val isUpdatingAllProfiles: Boolean = false,
+    val showUpdateAllSuccess: Boolean = false,
     // Status
     val memory: String = "",
     val goroutines: String = "",
@@ -353,7 +355,14 @@ class DashboardViewModel :
 
     fun updateProfile(profile: Profile) {
         if (profile.typed.type != TypedProfile.Type.Remote) return
-        if (currentState.updatingProfileId != null || currentState.updatedProfileId != null) return
+        if (
+            currentState.updatingProfileId != null ||
+            currentState.updatedProfileId != null ||
+            currentState.isUpdatingAllProfiles ||
+            currentState.showUpdateAllSuccess
+        ) {
+            return
+        }
 
         updateState {
             copy(
@@ -394,6 +403,81 @@ class DashboardViewModel :
                     updateState {
                         if (updatingProfileId == profile.id) {
                             copy(updatingProfileId = null, updatedProfileId = null)
+                        } else {
+                            this
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun updateAllProfiles() {
+        val remoteProfiles = currentState.profiles.filter { it.typed.type == TypedProfile.Type.Remote }
+        if (remoteProfiles.isEmpty()) return
+        if (
+            currentState.updatingProfileId != null ||
+            currentState.updatedProfileId != null ||
+            currentState.isUpdatingAllProfiles ||
+            currentState.showUpdateAllSuccess
+        ) {
+            return
+        }
+
+        updateState {
+            copy(
+                isUpdatingAllProfiles = true,
+                showUpdateAllSuccess = false,
+            )
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            var selectedProfileChanged = false
+            var firstError: Exception? = null
+            for (profile in remoteProfiles) {
+                try {
+                    val result = ProfileUpdater.update(profile)
+                    if (result.contentChanged && profile.id == Settings.selectedProfile) {
+                        selectedProfileChanged = true
+                    }
+                } catch (e: Exception) {
+                    if (firstError == null) firstError = e
+                }
+            }
+
+            loadProfiles()
+            if (selectedProfileChanged) {
+                withContext(Dispatchers.Main) {
+                    sendGlobalEvent(UiEvent.RequestReconnectService)
+                }
+            }
+
+            val updateError = firstError
+            withContext(Dispatchers.Main) {
+                if (updateError == null) {
+                    updateState {
+                        copy(
+                            isUpdatingAllProfiles = false,
+                            showUpdateAllSuccess = true,
+                        )
+                    }
+                } else {
+                    updateState {
+                        copy(
+                            isUpdatingAllProfiles = false,
+                            showUpdateAllSuccess = false,
+                        )
+                    }
+                    sendErrorMessage("Failed to update all profiles: ${updateError.message}")
+                }
+            }
+
+            if (updateError == null) {
+                delay(1500)
+                withContext(Dispatchers.Main) {
+                    updateState {
+                        if (showUpdateAllSuccess) {
+                            copy(showUpdateAllSuccess = false)
                         } else {
                             this
                         }

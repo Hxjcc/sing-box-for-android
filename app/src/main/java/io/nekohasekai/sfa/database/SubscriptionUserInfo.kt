@@ -1,11 +1,13 @@
 package io.nekohasekai.sfa.database
 
+import java.util.Date
 import java.util.Locale
 
 data class SubscriptionUserInfo(
     val upload: Long,
     val download: Long,
     val total: Long,
+    val expire: Long? = null,
 ) {
     val used: Long
         get() = if (upload > Long.MAX_VALUE - download) Long.MAX_VALUE else upload + download
@@ -15,6 +17,11 @@ data class SubscriptionUserInfo(
 
     val remainingFraction: Float
         get() = (remaining.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
+
+    val expireAt: Date?
+        get() = expire
+            ?.takeIf { it > 0L && it <= Long.MAX_VALUE / 1000L }
+            ?.let { Date(it * 1000L) }
 
     companion object {
         const val HEADER_NAME = "subscription-userinfo"
@@ -50,6 +57,7 @@ data class SubscriptionUserInfo(
                     upload = values["upload"] ?: 0L,
                     download = values["download"] ?: 0L,
                     total = total,
+                    expire = values["expire"]?.takeIf { it > 0L },
                 )
             } else {
                 null

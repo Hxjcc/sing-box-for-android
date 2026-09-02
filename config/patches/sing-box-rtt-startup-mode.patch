@@ -34,3 +34,158 @@ diff --git a/experimental/libbox/command_server.go b/experimental/libbox/command
  		IncludePackage: iteratorToArray(options.IncludePackage),
  		ExcludePackage: iteratorToArray(options.ExcludePackage),
  	})
+diff --git a/daemon/started_service.go b/daemon/started_service.go
+index a979523..fa7ba84 100644
+--- a/daemon/started_service.go
++++ b/daemon/started_service.go
+@@ -37,10 +37,12 @@ import (
+ const APIVersion = 4
+ 
+ const (
+-	urlTestPushMinInterval = 250 * time.Millisecond
+-	notificationQueueSize  = 16
+-	rttTestPrefix          = "__sfa_rtt__:"
+-	rttModePrefix          = "__sfa_rtt_mode__:"
++	urlTestPushMinInterval      = 250 * time.Millisecond
++	notificationQueueSize       = 16
++	rttTestPrefix               = "__sfa_rtt__:"
++	rttModePrefix               = "__sfa_rtt_mode__:"
++	startupSelectorRTTDelay     = 2 * time.Second
++	startupSelectorRTTFreshness = time.Minute
+ )
+ 
+ var _ StartedServiceServer = (*StartedService)(nil)
+@@ -307,10 +309,53 @@ func (s *StartedService) StartOrReloadService(ctx context.Context, profileConten
+ 	s.startedAt = time.Now()
+ 	s.updateStatus(ServiceStatus_STARTED)
+ 	s.serviceAccess.Unlock()
++	s.scheduleStartupSelectorRTT(instance)
+ 	runtimeDebug.FreeOSMemory()
+ 	return nil
+ }
+ 
++func (s *StartedService) scheduleStartupSelectorRTT(instance *Instance) {
++	if !urltest.RTTEnabled() {
++		return
++	}
++	go func() {
++		timer := time.NewTimer(startupSelectorRTTDelay)
++		defer timer.Stop()
++		select {
++		case <-timer.C:
++		case <-instance.ctx.Done():
++			return
++		}
++
++		s.serviceAccess.RLock()
++		active := s.instance == instance && s.serviceStatus.Status == ServiceStatus_STARTED
++		s.serviceAccess.RUnlock()
++		if !active {
++			return
++		}
++
++		var selectors []adapter.Outbound
++		for _, outbound := range instance.outboundManager.Outbounds() {
++			if _, isSelector := outbound.(*group.Selector); isSelector {
++				selectors = append(selectors, outbound)
++			}
++		}
++		if len(selectors) == 0 {
++			return
++		}
++		group.RTTTestSelectorOutbounds(
++			instance.ctx,
++			instance.outboundManager,
++			instance.urlTestHistoryStorage,
++			instance.logFactory.Logger(),
++			selectors,
++			"",
++			startupSelectorRTTFreshness,
++			false,
++		)
++	}()
++}
++
+ func (s *StartedService) Close() {
+ 	s.serviceAccess.Lock()
+ 	s.closed = true
+diff --git a/protocol/group/urltest.go b/protocol/group/urltest.go
+index a1b4ef9..ea4faa0 100644
+--- a/protocol/group/urltest.go
++++ b/protocol/group/urltest.go
+@@ -386,37 +386,44 @@ type urlTestResult struct {
+ }
+ 
+ type urlTestBatch struct {
+-	ctx      context.Context
+-	outbound adapter.OutboundManager
+-	history  *urltest.HistoryStorage
+-	logger   log.Logger
+-	batch    *batch.Batch[any]
+-	checked  map[string]bool
+-	groups   []adapter.OutboundGroup
+-	access   sync.Mutex
+-	result   map[string]uint16
+-	rtt      bool
++	ctx          context.Context
++	outbound     adapter.OutboundManager
++	history      *urltest.HistoryStorage
++	logger       log.Logger
++	batch        *batch.Batch[any]
++	checked      map[string]bool
++	groups       []adapter.OutboundGroup
++	access       sync.Mutex
++	result       map[string]uint16
++	rtt          bool
++	skipURLTests bool
+ }
+ 
+ func URLTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool) map[string]uint16 {
+-	return testOutbounds(ctx, outboundManager, history, logger, outbounds, link, interval, force, false)
++	return testOutbounds(ctx, outboundManager, history, logger, outbounds, link, interval, force, false, false)
+ }
+ 
+ func RTTTestOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool) map[string]uint16 {
+-	return testOutbounds(ctx, outboundManager, history, logger, outbounds, link, interval, force, true)
++	return testOutbounds(ctx, outboundManager, history, logger, outbounds, link, interval, force, true, false)
+ }
+ 
+-func testOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool, rtt bool) map[string]uint16 {
++// RTTTestSelectorOutbounds tests selector members while leaving nested URL test groups to their own checks.
++func RTTTestSelectorOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool) map[string]uint16 {
++	return testOutbounds(ctx, outboundManager, history, logger, outbounds, link, interval, force, true, true)
++}
++
++func testOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool, rtt bool, skipURLTests bool) map[string]uint16 {
+ 	b, _ := batch.New(ctx, batch.WithConcurrencyNum[any](10))
+ 	testBatch := &urlTestBatch{
+-		ctx:      ctx,
+-		outbound: outboundManager,
+-		history:  history,
+-		logger:   logger,
+-		batch:    b,
+-		checked:  make(map[string]bool),
+-		result:   make(map[string]uint16),
+-		rtt:      rtt,
++		ctx:          ctx,
++		outbound:     outboundManager,
++		history:      history,
++		logger:       logger,
++		batch:        b,
++		checked:      make(map[string]bool),
++		result:       make(map[string]uint16),
++		rtt:          rtt,
++		skipURLTests: skipURLTests,
+ 	}
+ 	testBatch.test(outbounds, link, interval, force)
+ 	b.Wait()
+@@ -439,6 +446,9 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, link string, interval
+ 		case *URLTest:
+ 			b.checked[tag] = true
+ 			b.groups = append(b.groups, nested)
++			if b.skipURLTests {
++				continue
++			}
+ 			if b.rtt {
+ 				b.test(common.FilterNotNil(common.Map(nested.All(), func(it string) adapter.Outbound {
+ 					member, _ := b.outbound.Outbound(it)

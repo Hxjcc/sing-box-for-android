@@ -8,7 +8,7 @@ The Traffic variant uses a patched ARM64 sing-box v1.14.0 core. Rebuild it from 
 .\scripts\build-custom-libbox.ps1 -Force
 ```
 
-The script clones the pinned tag, applies the RTT patches in order, runs the relevant Go tests, builds `libbox.aar`, and copies it to `app/libs`.
+The script clones the pinned tag, applies the RTT patches in order, runs the relevant Go tests, builds `libbox.aar`, and copies it to `app/libs`. When RTT mode is enabled, the core also performs a one-time delayed RTT pass over selector members after startup; nested URL test groups keep their own health checks.
 
 OpenJDK 17, Android SDK, Android NDK r28, Git, and Go are required. Pass `-DependenciesRoot` if the local tools are not stored in `D:\Temp\sfa-rebuild-deps`.
 

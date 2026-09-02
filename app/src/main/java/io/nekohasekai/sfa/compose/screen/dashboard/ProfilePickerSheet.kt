@@ -5,7 +5,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -17,6 +16,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -84,6 +84,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import java.text.DateFormat
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -97,11 +98,21 @@ fun ProfilePickerSheet(
     onProfileMove: (Int, Int) -> Unit,
     updatingProfileId: Long? = null,
     updatedProfileId: Long? = null,
+    isUpdatingAllProfiles: Boolean = false,
+    showUpdateAllSuccess: Boolean = false,
+    onUpdateAll: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val isDarkTheme = isSystemInDarkTheme()
+    val hasRemoteProfiles = profiles.any { it.typed.type == TypedProfile.Type.Remote }
+    val updateAllEnabled = hasRemoteProfiles &&
+        updatingProfileId == null &&
+        updatedProfileId == null &&
+        !isUpdatingAllProfiles &&
+        !showUpdateAllSuccess
 
     var showQRCodeDialog by remember { mutableStateOf(false) }
     var qrCodeProfile by remember { mutableStateOf<Profile?>(null) }
@@ -117,17 +128,45 @@ fun ProfilePickerSheet(
                 .fillMaxWidth()
                 .padding(bottom = 32.dp),
         ) {
-            Text(
-                text = stringResource(R.string.title_configuration),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+            Row(
                 modifier = Modifier.padding(
                     start = 24.dp,
                     end = 24.dp,
                     top = 8.dp,
                     bottom = 16.dp,
-                ),
-            )
+                ).fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.title_configuration),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                val updateAllDescription = stringResource(R.string.update_all_profiles)
+                Surface(
+                    onClick = onUpdateAll,
+                    enabled = hasRemoteProfiles,
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isDarkTheme) {
+                        lerp(
+                            MaterialTheme.colorScheme.surfaceContainerHighest,
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            0.5f,
+                        )
+                    } else {
+                        MaterialTheme.colorScheme.surfaceDim
+                    },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    ProfileUpdateStatusIcon(
+                        isUpdating = isUpdatingAllProfiles,
+                        showSuccess = showUpdateAllSuccess,
+                        enabled = updateAllEnabled,
+                        contentDescription = updateAllDescription,
+                    )
+                }
+            }
 
             val lazyListState = rememberLazyListState()
             val reorderableLazyListState =
@@ -141,20 +180,20 @@ fun ProfilePickerSheet(
                     .fillMaxWidth()
                     .heightIn(min = 100.dp, max = 400.dp)
                     .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 itemsIndexed(profiles, key = { _, profile -> profile.id }) { _, profile ->
                     ReorderableItem(
                         reorderableLazyListState,
                         key = profile.id,
-                    ) { isDragging ->
+                    ) { _ ->
                         ProfilePickerRow(
                             profile = profile,
                             isSelected = profile.id == selectedProfileId,
-                            isDragging = isDragging,
                             isUpdating = profile.id == updatingProfileId,
                             showUpdateSuccess = profile.id == updatedProfileId,
-                            updateEnabled = updatingProfileId == null && updatedProfileId == null,
+                            updateEnabled = updateAllEnabled,
                             onSelect = {
                                 onProfileSelected(profile)
                                 onDismiss()
@@ -227,7 +266,6 @@ private suspend fun createProfileContent(profile: Profile): ByteArray {
 private fun ProfilePickerRow(
     profile: Profile,
     isSelected: Boolean,
-    isDragging: Boolean,
     isUpdating: Boolean,
     showUpdateSuccess: Boolean,
     updateEnabled: Boolean,
@@ -245,16 +283,6 @@ private fun ProfilePickerRow(
     val coroutineScope = rememberCoroutineScope()
     val isDarkTheme = isSystemInDarkTheme()
     val subscriptionUserInfo = profile.typed.subscriptionUserInfo
-
-    val animatedElevation by animateFloatAsState(
-        targetValue = when {
-            isDragging -> 8.dp.value
-            isSelected -> 2.dp.value
-            else -> 0.dp.value
-        },
-        animationSpec = tween(300),
-        label = "Elevation",
-    )
 
     val saveFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/octet-stream"),
@@ -291,7 +319,6 @@ private fun ProfilePickerRow(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = when {
-            isDragging -> MaterialTheme.colorScheme.tertiaryContainer
             isSelected -> if (isDarkTheme) {
                 lerp(
                     MaterialTheme.colorScheme.surfaceContainerLow,
@@ -311,7 +338,8 @@ private fun ProfilePickerRow(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
             }
         },
-        tonalElevation = animatedElevation.dp,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             ProfileTrafficProgressFill(
@@ -366,6 +394,12 @@ private fun ProfilePickerRow(
                             SubscriptionUserInfo.formatBytes(it.remaining),
                         )
                     }
+                    val expiryDescription = subscriptionUserInfo?.expireAt?.let { expireAt ->
+                        stringResource(
+                            R.string.profile_traffic_expires,
+                            DateFormat.getDateInstance(DateFormat.MEDIUM).format(expireAt),
+                        )
+                    }
                     Text(
                         text = listOfNotNull(profileDescription, trafficDescription).joinToString(" · "),
                         style = MaterialTheme.typography.labelSmall,
@@ -373,6 +407,15 @@ private fun ProfilePickerRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    if (expiryDescription != null) {
+                        Text(
+                            text = expiryDescription,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
 
                 Row(
@@ -400,6 +443,7 @@ private fun ProfilePickerRow(
                                 isUpdating = isUpdating,
                                 showSuccess = showUpdateSuccess,
                                 enabled = updateEnabled,
+                                contentDescription = stringResource(R.string.update_profile),
                             )
                         }
                     } else {
@@ -553,6 +597,7 @@ private fun ProfileUpdateStatusIcon(
     isUpdating: Boolean,
     showSuccess: Boolean,
     enabled: Boolean,
+    contentDescription: String,
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -581,7 +626,7 @@ private fun ProfileUpdateStatusIcon(
         ) {
             Icon(
                 imageVector = Icons.Default.Check,
-                contentDescription = stringResource(R.string.update_profile),
+                contentDescription = contentDescription,
                 modifier = Modifier.size(22.dp),
                 tint = MaterialTheme.colorScheme.primary,
             )
@@ -593,7 +638,7 @@ private fun ProfileUpdateStatusIcon(
         ) {
             Icon(
                 imageVector = Icons.Default.Refresh,
-                contentDescription = stringResource(R.string.update_profile),
+                contentDescription = contentDescription,
                 modifier = Modifier.size(20.dp),
                 tint = if (enabled) {
                     MaterialTheme.colorScheme.onSurfaceVariant

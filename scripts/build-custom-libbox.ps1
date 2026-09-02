@@ -106,7 +106,7 @@ if (-not (Test-Path -LiteralPath $gobindPath)) {
 
 Push-Location $sourceDirectory
 try {
-    & $goExecutable test ./common/urltest ./daemon
+    & $goExecutable test ./common/urltest ./protocol/group ./daemon
     if ($LASTEXITCODE -ne 0) { throw "Core tests failed" }
     & $goExecutable run ./cmd/internal/build_libbox -target android -platform android/arm64
     if ($LASTEXITCODE -ne 0) { throw "libbox build failed" }
