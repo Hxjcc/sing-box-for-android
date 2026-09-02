@@ -50,7 +50,7 @@ index a979523..fa7ba84 100644
 +	notificationQueueSize       = 16
 +	rttTestPrefix               = "__sfa_rtt__:"
 +	rttModePrefix               = "__sfa_rtt_mode__:"
-+	startupSelectorRTTDelay     = 2 * time.Second
++	startupSelectorRTTDelay     = 500 * time.Millisecond
 +	startupSelectorRTTFreshness = time.Minute
  )
  
@@ -157,7 +157,8 @@ index a1b4ef9..ea4faa0 100644
 +}
 +
 +func testOutbounds(ctx context.Context, outboundManager adapter.OutboundManager, history *urltest.HistoryStorage, logger log.Logger, outbounds []adapter.Outbound, link string, interval time.Duration, force bool, rtt bool, skipURLTests bool) map[string]uint16 {
- 	b, _ := batch.New(ctx, batch.WithConcurrencyNum[any](10))
+-	b, _ := batch.New(ctx, batch.WithConcurrencyNum[any](10))
++	b, _ := batch.New(ctx, batch.WithConcurrencyNum[any](20))
  	testBatch := &urlTestBatch{
 -		ctx:      ctx,
 -		outbound: outboundManager,

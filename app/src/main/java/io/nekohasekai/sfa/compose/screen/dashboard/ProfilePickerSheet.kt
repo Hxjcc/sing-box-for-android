@@ -335,7 +335,11 @@ private fun ProfilePickerRow(
                     0.35f,
                 )
             } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                lerp(
+                    MaterialTheme.colorScheme.surfaceContainerLow,
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    0.3f,
+                )
             }
         },
         tonalElevation = 0.dp,
@@ -403,7 +407,8 @@ private fun ProfilePickerRow(
                     Text(
                         text = listOfNotNull(profileDescription, trafficDescription).joinToString(" · "),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.76f),
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -411,7 +416,8 @@ private fun ProfilePickerRow(
                         Text(
                             text = expiryDescription,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.76f),
+                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )

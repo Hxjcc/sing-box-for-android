@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.ProfileContent
@@ -292,77 +293,88 @@ fun ProfilesCard(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                ProfileInfoRow(profile = selectedProfile)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ProfileInfoRow(
+                        profile = selectedProfile,
+                        modifier = Modifier.weight(1f),
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                ProfileActionRow(
-                    profile = selectedProfile,
-                    isUpdating = selectedProfile?.id == updatingProfileId || isUpdatingAllProfiles,
-                    showUpdateSuccess = selectedProfile?.id == updatedProfileId || showUpdateAllSuccess,
-                    onEdit = { selectedProfile?.let { onProfileEdit(it) } },
-                    onUpdate = { selectedProfile?.let { onProfileUpdate(it) } },
-                    onShareFile = {
-                        selectedProfile?.let {
-                            coroutineScope.launch(Dispatchers.IO) {
-                                try {
-                                    context.shareProfile(it)
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        context.errorDialogBuilder(e).show()
+                    ProfileActionRow(
+                        profile = selectedProfile,
+                        isUpdating = selectedProfile?.id == updatingProfileId || isUpdatingAllProfiles,
+                        showUpdateSuccess = selectedProfile?.id == updatedProfileId || showUpdateAllSuccess,
+                        onEdit = { selectedProfile?.let { onProfileEdit(it) } },
+                        onUpdate = { selectedProfile?.let { onProfileUpdate(it) } },
+                        onShareFile = {
+                            selectedProfile?.let {
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    try {
+                                        context.shareProfile(it)
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            context.errorDialogBuilder(e).show()
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                    onSaveFile = {
-                        selectedProfile?.let {
-                            saveFileLauncher.launch("${it.name}.bpf")
-                        }
-                    },
-                    onSaveJson = {
-                        selectedProfile?.let {
-                            saveJsonFileLauncher.launch("${it.name}.json")
-                        }
-                    },
-                    onShareJson = {
-                        selectedProfile?.let {
-                            coroutineScope.launch(Dispatchers.IO) {
-                                try {
-                                    context.shareProfileAsJson(it)
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        context.errorDialogBuilder(e).show()
+                        },
+                        onSaveFile = {
+                            selectedProfile?.let {
+                                saveFileLauncher.launch("${it.name}.bpf")
+                            }
+                        },
+                        onSaveJson = {
+                            selectedProfile?.let {
+                                saveJsonFileLauncher.launch("${it.name}.json")
+                            }
+                        },
+                        onShareJson = {
+                            selectedProfile?.let {
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    try {
+                                        context.shareProfileAsJson(it)
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            context.errorDialogBuilder(e).show()
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                    onShareURL = {
-                        selectedProfile?.let {
-                            qrCodeProfile = it
-                            showQRCodeDialog = true
-                        }
-                    },
-                    onShareQRS = {
-                        selectedProfile?.let { profile ->
-                            coroutineScope.launch(Dispatchers.IO) {
-                                try {
-                                    val data = createProfileContent(profile)
-                                    withContext(Dispatchers.Main) {
-                                        qrsProfile = profile
-                                        qrsProfileData = data
-                                        showQRSDialog = true
-                                    }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        context.errorDialogBuilder(e).show()
+                        },
+                        onShareURL = {
+                            selectedProfile?.let {
+                                qrCodeProfile = it
+                                showQRCodeDialog = true
+                            }
+                        },
+                        onShareQRS = {
+                            selectedProfile?.let { profile ->
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    try {
+                                        val data = createProfileContent(profile)
+                                        withContext(Dispatchers.Main) {
+                                            qrsProfile = profile
+                                            qrsProfileData = data
+                                            showQRSDialog = true
+                                        }
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            context.errorDialogBuilder(e).show()
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                )
+                        },
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }
@@ -650,12 +662,14 @@ private suspend fun createProfileContent(profile: Profile): ByteArray {
 }
 
 @Composable
-private fun ProfileInfoRow(profile: Profile?) {
+private fun ProfileInfoRow(profile: Profile?, modifier: Modifier = Modifier) {
     if (profile == null) return
 
     val context = LocalContext.current
+    val infoColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
 
     Column(
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(
@@ -674,7 +688,7 @@ private fun ProfileInfoRow(profile: Profile?) {
                     },
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = infoColor,
                 )
                 Text(
                     text = if (profile.typed.type == TypedProfile.Type.Remote) {
@@ -683,7 +697,8 @@ private fun ProfileInfoRow(profile: Profile?) {
                         stringResource(R.string.profile_type_local)
                     },
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = infoColor,
+                    fontWeight = FontWeight.Medium,
                 )
             }
 
@@ -696,12 +711,13 @@ private fun ProfileInfoRow(profile: Profile?) {
                         imageVector = Icons.Default.AccessTime,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = infoColor,
                     )
                     Text(
                         text = RelativeTimeFormatter.format(context, profile.typed.lastUpdated),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = infoColor,
+                        fontWeight = FontWeight.Medium,
                     )
                 }
             }
@@ -716,7 +732,7 @@ private fun ProfileInfoRow(profile: Profile?) {
                     imageVector = Icons.Default.CalendarMonth,
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = infoColor,
                 )
                 Text(
                     text = stringResource(
@@ -724,7 +740,10 @@ private fun ProfileInfoRow(profile: Profile?) {
                         DateFormat.getDateInstance(DateFormat.MEDIUM).format(expireAt),
                     ),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = infoColor,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -748,8 +767,7 @@ private fun ProfileActionRow(
     if (profile == null) return
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ActionButton(
             icon = Icons.Default.Edit,

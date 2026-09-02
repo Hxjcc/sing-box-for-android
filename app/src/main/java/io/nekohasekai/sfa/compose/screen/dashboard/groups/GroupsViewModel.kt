@@ -267,12 +267,11 @@ class GroupsViewModel(private val sharedCommandClient: CommandClient? = null) :
 
     override fun onDisconnected() {
         viewModelScope.launch(Dispatchers.Main) {
-            updateState {
-                copy(
-                    groups = emptyList(),
-                    isLoading = false,
-                )
-            }
+            // Keep the last group snapshot while the app is backgrounded. Clearing the list
+            // temporarily clamps its LazyListState to the first item, so returning to the app
+            // loses the user's scroll position. A real service stop is handled separately by
+            // handleServiceStatusChange().
+            updateState { copy(isLoading = false) }
         }
     }
 

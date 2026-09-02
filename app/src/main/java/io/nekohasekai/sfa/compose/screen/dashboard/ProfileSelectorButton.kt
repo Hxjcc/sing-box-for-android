@@ -177,7 +177,7 @@ internal fun ProfileTrafficProgressFill(
             return@Canvas
         }
 
-        val fadeWidth = minOf(18.dp.toPx(), fillWidth)
+        val fadeWidth = minOf(8.dp.toPx(), fillWidth)
         val solidWidth = (fillWidth - fadeWidth).coerceAtLeast(0f)
         if (solidWidth > 0f) {
             drawRect(
@@ -215,6 +215,7 @@ private fun ProfileSelectorContent(selectedProfile: Profile?, userInfo: Subscrip
                 ),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
             )
             Spacer(modifier = Modifier.width(8.dp))
