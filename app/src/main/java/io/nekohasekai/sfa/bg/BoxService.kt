@@ -47,7 +47,10 @@ import java.io.File
 class BoxService(private val service: Service, private val platformInterface: PlatformInterface) : CommandServerHandler {
     companion object {
         private const val PROFILE_UPDATE_INTERVAL = 15L * 60 * 1000 // 15 minutes in milliseconds
+        private const val PROFILE_SELECTED_CACHE_ID_PREFIX = "sfa-profile-"
         private const val TAG = "BoxService"
+
+        private fun profileSelectedCacheID(profileID: Long): String = PROFILE_SELECTED_CACHE_ID_PREFIX + profileID
 
         fun start() {
             val intent =
@@ -139,6 +142,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
                     content,
                     OverrideOptions().apply {
                         autoRedirect = Settings.autoRedirect
+                        selectedCacheID = profileSelectedCacheID(profile.id)
                         rttDelayTest = Settings.rttDelayTest
                         if (Vendor.isPerAppProxyAvailable() && Settings.perAppProxyEnabled) {
                             val appList = Settings.getEffectivePerAppProxyList()
@@ -222,6 +226,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
                 content,
                 OverrideOptions().apply {
                     autoRedirect = Settings.autoRedirect
+                    selectedCacheID = profileSelectedCacheID(profile.id)
                     rttDelayTest = Settings.rttDelayTest
                     if (Vendor.isPerAppProxyAvailable() && Settings.perAppProxyEnabled) {
                         val appList = Settings.getEffectivePerAppProxyList()

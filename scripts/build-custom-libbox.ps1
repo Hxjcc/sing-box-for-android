@@ -77,20 +77,44 @@ if ([string]::IsNullOrWhiteSpace($env:GOSUMDB) -or $env:GOSUMDB -eq "off") {
 }
 $env:PATH = "$javaHomePath\bin;$goBinPath;$(Join-Path $goPath 'bin');$env:PATH"
 
-$coreCommit = "5ee65a5ca9e6a448a5fa2f47b55b51fe2fcf578d"
+$coreCommit = "5c41478f1f3d8c1ad14fecb50dd18782a21eb6b8"
+$coreVersionTag = "v1.14.0"
+$coreFetchDepth = 64
+$expectedCoreDescription = "v1.14.0-21-g5c41478"
 git init $sourceDirectory
 if ($LASTEXITCODE -ne 0) { throw "Unable to initialize the sing-box source tree" }
 git -C $sourceDirectory remote add origin https://github.com/SagerNet/sing-box.git
 if ($LASTEXITCODE -ne 0) { throw "Unable to configure the sing-box source remote" }
-git -C $sourceDirectory fetch --depth 1 origin $coreCommit
+git -C $sourceDirectory fetch --depth $coreFetchDepth origin $coreCommit "refs/tags/${coreVersionTag}:refs/tags/${coreVersionTag}"
 if ($LASTEXITCODE -ne 0) { throw "Unable to fetch sing-box core $coreCommit" }
 git -C $sourceDirectory checkout --detach FETCH_HEAD
 if ($LASTEXITCODE -ne 0) { throw "Unable to check out sing-box core $coreCommit" }
+$actualCoreCommit = (git -C $sourceDirectory rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $actualCoreCommit -ne $coreCommit) {
+    throw "Unexpected sing-box core commit: $actualCoreCommit"
+}
+$actualCoreDescription = (git -C $sourceDirectory describe --tags).Trim()
+if ($LASTEXITCODE -ne 0 -or $actualCoreDescription -ne $expectedCoreDescription) {
+    throw "Unexpected sing-box core version: $actualCoreDescription"
+}
+Write-Host "Core source: $actualCoreDescription"
+$baseCoreVersion = $coreVersionTag.TrimStart("v")
+$shortCoreCommit = $actualCoreCommit.Substring(0, 7)
+$embeddedCoreVersion = if ($actualCoreDescription -eq $coreVersionTag) {
+    $baseCoreVersion
+} else {
+    "$baseCoreVersion-$shortCoreCommit"
+}
+if ($embeddedCoreVersion -notmatch '^[0-9A-Za-z.-]+$') {
+    throw "Unsafe embedded core version: $embeddedCoreVersion"
+}
+Write-Host "Embedded core version: $embeddedCoreVersion"
 
 $patches = @(
     "sing-box-rtt-delay-test.patch",
     "sing-box-rtt-mode-sync.patch",
-    "sing-box-rtt-startup-mode.patch"
+    "sing-box-rtt-startup-mode.patch",
+    "sing-box-profile-cache-isolation.patch"
 )
 foreach ($patchName in $patches) {
     $patchPath = Join-Path $repositoryRoot "config\patches\$patchName"
@@ -99,6 +123,33 @@ foreach ($patchName in $patches) {
     git -C $sourceDirectory apply $patchPath
     if ($LASTEXITCODE -ne 0) { throw "Patch apply failed: $patchName" }
 }
+
+$versionOverridePath = Join-Path $sourceDirectory "constant\version_sfa.go"
+$versionTestPath = Join-Path $sourceDirectory "constant\version_sfa_test.go"
+$utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
+$versionOverrideSource = @"
+package constant
+
+func init() {
+	Version = "$embeddedCoreVersion"
+}
+"@
+$versionTestSource = @"
+package constant
+
+import "testing"
+
+func TestSFAEmbeddedVersion(t *testing.T) {
+	if Version != "$embeddedCoreVersion" {
+		t.Fatalf("unexpected embedded version: %q", Version)
+	}
+}
+"@
+[System.IO.File]::WriteAllText($versionOverridePath, $versionOverrideSource, $utf8WithoutBom)
+[System.IO.File]::WriteAllText($versionTestPath, $versionTestSource, $utf8WithoutBom)
+$gofmtExecutable = Join-Path $goBinPath "gofmt.exe"
+& $gofmtExecutable -w $versionOverridePath $versionTestPath
+if ($LASTEXITCODE -ne 0) { throw "Unable to format generated core version sources" }
 
 $gomobilePath = Join-Path $goPath "bin\gomobile.exe"
 $gobindPath = Join-Path $goPath "bin\gobind.exe"
@@ -113,7 +164,7 @@ if (-not (Test-Path -LiteralPath $gobindPath)) {
 
 Push-Location $sourceDirectory
 try {
-    & $goExecutable test ./common/urltest ./protocol/group ./daemon
+    & $goExecutable test ./constant ./common/urltest ./experimental/cachefile ./protocol/group ./daemon
     if ($LASTEXITCODE -ne 0) { throw "Core tests failed" }
     & $goExecutable run ./cmd/internal/build_libbox -target android -platform android/arm64
     if ($LASTEXITCODE -ne 0) { throw "libbox build failed" }

@@ -1,0 +1,230 @@
+diff --git a/adapter/experimental.go b/adapter/experimental.go
+index 8e93cff..d995a50 100644
+--- a/adapter/experimental.go
++++ b/adapter/experimental.go
+@@ -25,6 +25,8 @@ type CacheFile interface {
+ 	LifecycleService
+ 
+ 	CacheID() string
++	SelectedCacheID() string
++	SetSelectedCacheID(cacheID string)
+ 
+ 	StoreFakeIP() bool
+ 	FakeIPStorage
+diff --git a/daemon/instance.go b/daemon/instance.go
+index 9c30824..dd2daa3 100644
+--- a/daemon/instance.go
++++ b/daemon/instance.go
+@@ -76,10 +76,11 @@ func (s *StartedService) FormatConfig(ctx context.Context, configContent string)
+ }
+ 
+ type OverrideOptions struct {
+-	AutoRedirect   bool
+-	RTTDelayTest   bool
+-	IncludePackage []string
+-	ExcludePackage []string
++	AutoRedirect    bool
++	RTTDelayTest    bool
++	SelectedCacheID string
++	IncludePackage  []string
++	ExcludePackage  []string
+ }
+ 
+ func (s *StartedService) newInstance(ctx context.Context, profileContent string, overrideOptions *OverrideOptions) (*Instance, error) {
+@@ -135,12 +136,16 @@ func (s *StartedService) newInstance(ctx context.Context, profileContent string,
+ 		return nil, err
+ 	}
+ 	i.instance = boxInstance
++	cacheFile := service.FromContext[adapter.CacheFile](ctx)
++	if cacheFile != nil && overrideOptions != nil {
++		cacheFile.SetSelectedCacheID(overrideOptions.SelectedCacheID)
++	}
+ 	i.connectionManager = service.FromContext[adapter.ConnectionManager](ctx)
+ 	i.clashMode = service.PtrFromContext[clashmode.Manager](ctx)
+ 	i.trafficManager = service.PtrFromContext[trafficcontrol.Manager](ctx)
+ 	i.pauseManager = service.FromContext[pause.Manager](ctx)
+ 	i.registerPauseCallback(ctx)
+-	i.cacheFile = service.FromContext[adapter.CacheFile](ctx)
++	i.cacheFile = cacheFile
+ 	i.outboundManager = service.FromContext[adapter.OutboundManager](ctx)
+ 	i.endpointManager = service.FromContext[adapter.EndpointManager](ctx)
+ 	i.logFactory = boxInstance.LogFactory()
+diff --git a/experimental/cachefile/cache.go b/experimental/cachefile/cache.go
+index d640cbc..a8c1250 100644
+--- a/experimental/cachefile/cache.go
++++ b/experimental/cachefile/cache.go
+@@ -50,6 +50,7 @@ type CacheFile struct {
+ 	path              string
+ 	cacheID           []byte
+ 	cacheIDText       string
++	selectedCacheID   string
+ 	storeFakeIP       bool
+ 	storeRDRC         bool
+ 	storeDNS          bool
+@@ -140,6 +141,14 @@ func (c *CacheFile) CacheID() string {
+ 	return c.cacheIDText
+ }
+ 
++func (c *CacheFile) SelectedCacheID() string {
++	return c.selectedCacheID
++}
++
++func (c *CacheFile) SetSelectedCacheID(cacheID string) {
++	c.selectedCacheID = cacheID
++}
++
+ func (c *CacheFile) SetOptimisticTimeout(timeout time.Duration) {
+ 	c.optimisticTimeout = timeout
+ }
+@@ -397,6 +406,13 @@ func (c *CacheFile) createBucket(t *bbolt.Tx, key []byte) (*bbolt.Bucket, error)
+ 	return bucket.CreateBucketIfNotExists(key)
+ }
+ 
++func selectedCacheKey(cacheID string, group string) []byte {
++	if cacheID == "" {
++		return []byte(group)
++	}
++	return []byte("\x00" + cacheID + "\x00" + group)
++}
++
+ func (c *CacheFile) LoadSelected(group string) string {
+ 	var selected string
+ 	c.view(func(t *bbolt.Tx) error {
+@@ -404,7 +420,7 @@ func (c *CacheFile) LoadSelected(group string) string {
+ 		if bucket == nil {
+ 			return nil
+ 		}
+-		selectedBytes := bucket.Get([]byte(group))
++		selectedBytes := bucket.Get(selectedCacheKey(c.selectedCacheID, group))
+ 		if len(selectedBytes) > 0 {
+ 			selected = string(selectedBytes)
+ 		}
+@@ -419,7 +435,7 @@ func (c *CacheFile) StoreSelected(group, selected string) error {
+ 		if err != nil {
+ 			return err
+ 		}
+-		return bucket.Put([]byte(group), []byte(selected))
++		return bucket.Put(selectedCacheKey(c.selectedCacheID, group), []byte(selected))
+ 	})
+ }
+ 
+diff --git a/experimental/cachefile/cache_test.go b/experimental/cachefile/cache_test.go
+new file mode 100644
+index 0000000..f540f49
+--- /dev/null
++++ b/experimental/cachefile/cache_test.go
+@@ -0,0 +1,78 @@
++package cachefile
++
++import (
++	"path/filepath"
++	"testing"
++
++	"github.com/sagernet/bbolt"
++)
++
++func openSelectedCacheDatabase(t *testing.T) *bbolt.DB {
++	t.Helper()
++	database, err := bbolt.Open(filepath.Join(t.TempDir(), "cache.db"), 0o600, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() {
++		if closeErr := database.Close(); closeErr != nil {
++			t.Error(closeErr)
++		}
++	})
++	return database
++}
++
++func selectedCacheForTest(database *bbolt.DB, cacheID string, selectedCacheID string) *CacheFile {
++	var cacheIDBytes []byte
++	if cacheID != "" {
++		cacheIDBytes = append([]byte{0}, []byte(cacheID)...)
++	}
++	return &CacheFile{
++		cacheID:         cacheIDBytes,
++		cacheIDText:     cacheID,
++		selectedCacheID: selectedCacheID,
++		DB:              database,
++		pending:         newPendingWrites(),
++	}
++}
++
++func TestSelectedCacheIsolatedByProfile(t *testing.T) {
++	database := openSelectedCacheDatabase(t)
++	firstProfile := selectedCacheForTest(database, "", "sfa-profile-1")
++	secondProfile := selectedCacheForTest(database, "", "sfa-profile-2")
++	if err := firstProfile.StoreSelected("selector", "proxy-a"); err != nil {
++		t.Fatal(err)
++	}
++	if err := secondProfile.StoreSelected("selector", "proxy-b"); err != nil {
++		t.Fatal(err)
++	}
++	if selected := firstProfile.LoadSelected("selector"); selected != "proxy-a" {
++		t.Fatalf("unexpected first profile selection: %q", selected)
++	}
++	if selected := secondProfile.LoadSelected("selector"); selected != "proxy-b" {
++		t.Fatalf("unexpected second profile selection: %q", selected)
++	}
++}
++
++func TestSelectedCacheDoesNotUseLegacySharedSelection(t *testing.T) {
++	database := openSelectedCacheDatabase(t)
++	legacyCache := selectedCacheForTest(database, "", "")
++	profileCache := selectedCacheForTest(database, "", "sfa-profile-1")
++	if err := legacyCache.StoreSelected("selector", "proxy-a"); err != nil {
++		t.Fatal(err)
++	}
++	if selected := profileCache.LoadSelected("selector"); selected != "" {
++		t.Fatalf("legacy selection was unexpectedly loaded: %q", selected)
++	}
++}
++
++func TestSelectedCacheKeepsConfiguredCacheShared(t *testing.T) {
++	database := openSelectedCacheDatabase(t)
++	firstProfile := selectedCacheForTest(database, "custom-cache", "sfa-profile-1")
++	secondProfile := selectedCacheForTest(database, "custom-cache", "sfa-profile-2")
++	if err := firstProfile.StoreMode("global"); err != nil {
++		t.Fatal(err)
++	}
++	if mode := secondProfile.LoadMode(); mode != "global" {
++		t.Fatalf("configured cache data was unexpectedly isolated: %q", mode)
++	}
++}
+diff --git a/experimental/libbox/command_server.go b/experimental/libbox/command_server.go
+index 4bd891b..e288874 100644
+--- a/experimental/libbox/command_server.go
++++ b/experimental/libbox/command_server.go
+@@ -203,10 +203,11 @@ func (s *CommandServer) Close() {
+ }
+ 
+ type OverrideOptions struct {
+-	AutoRedirect   bool
+-	RTTDelayTest   bool
+-	IncludePackage StringIterator
+-	ExcludePackage StringIterator
++	AutoRedirect    bool
++	RTTDelayTest    bool
++	SelectedCacheID string
++	IncludePackage  StringIterator
++	ExcludePackage  StringIterator
+ }
+ 
+ func (s *CommandServer) StartOrReloadService(configContent string, options *OverrideOptions) error {
+@@ -215,10 +216,11 @@ func (s *CommandServer) StartOrReloadService(configContent string, options *Over
+ 		copyConfigSnapshot(filepath.Join(sWorkingPath, powerreport.DraftDirectoryName))
+ 	}
+ 	err := s.StartedService.StartOrReloadService(s.ctx, configContent, &daemon.OverrideOptions{
+-		AutoRedirect:   options.AutoRedirect,
+-		RTTDelayTest:   options.RTTDelayTest,
+-		IncludePackage: iteratorToArray(options.IncludePackage),
+-		ExcludePackage: iteratorToArray(options.ExcludePackage),
++		AutoRedirect:    options.AutoRedirect,
++		RTTDelayTest:    options.RTTDelayTest,
++		SelectedCacheID: options.SelectedCacheID,
++		IncludePackage:  iteratorToArray(options.IncludePackage),
++		ExcludePackage:  iteratorToArray(options.ExcludePackage),
+ 	})
+ 	if err != nil {
+ 		return E.Cause(err, "start or reload service")

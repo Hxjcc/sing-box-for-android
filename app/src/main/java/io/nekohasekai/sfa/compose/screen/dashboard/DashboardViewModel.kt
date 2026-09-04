@@ -381,10 +381,12 @@ class DashboardViewModel :
                     updateState { copy(updatingProfileId = null, updatedProfileId = profile.id) }
                 }
 
-                if (result.contentChanged && profile.id == Settings.selectedProfile) {
-                    withContext(Dispatchers.Main) {
-                        sendGlobalEvent(UiEvent.RequestReconnectService)
-                    }
+                if (
+                    result.contentChanged &&
+                    profile.id == Settings.selectedProfile &&
+                    _serviceStatus.value == Status.Started
+                ) {
+                    Libbox.newStandaloneCommandClient().serviceReload()
                 }
 
                 delay(1500)
@@ -446,10 +448,8 @@ class DashboardViewModel :
             }
 
             loadProfiles()
-            if (selectedProfileChanged) {
-                withContext(Dispatchers.Main) {
-                    sendGlobalEvent(UiEvent.RequestReconnectService)
-                }
+            if (selectedProfileChanged && _serviceStatus.value == Status.Started) {
+                Libbox.newStandaloneCommandClient().serviceReload()
             }
 
             val updateError = firstError
