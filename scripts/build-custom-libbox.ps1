@@ -71,19 +71,38 @@ $env:ANDROID_SDK_ROOT = $androidSdkPath
 $env:ANDROID_NDK_HOME = $androidNdkPath
 $env:GOPATH = $goPath
 $env:GOMODCACHE = $goModuleCache
-$env:GOTOOLCHAIN = "local"
+$goVersionLine = Get-Content -LiteralPath (Join-Path $repositoryRoot "version.properties") |
+    Select-String -Pattern '^GO_VERSION=(go[0-9]+\.[0-9]+\.[0-9]+)\s*$' |
+    Select-Object -First 1
+if ($null -eq $goVersionLine) {
+    throw "GO_VERSION is missing or invalid in version.properties"
+}
+$requiredGoVersion = $goVersionLine.Matches[0].Groups[1].Value
+$env:GOTOOLCHAIN = $requiredGoVersion
 # The official proxy is pinned here because mirrors can lag behind new
 # pseudo-versions such as the cronet-go builds required by sing-box.
 $env:GOPROXY = "https://proxy.golang.org,direct"
 if ([string]::IsNullOrWhiteSpace($env:GOSUMDB) -or $env:GOSUMDB -eq "off") {
     $env:GOSUMDB = "sum.golang.org"
 }
+$toolchainRoot = & $goExecutable env GOROOT
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($toolchainRoot)) {
+    throw "Unable to resolve required Go toolchain $requiredGoVersion"
+}
+$goBinPath = Join-Path $toolchainRoot.Trim() "bin"
+$goExecutable = Join-Path $goBinPath "go.exe"
+$actualGoVersion = & $goExecutable version
+if ($LASTEXITCODE -ne 0 -or $actualGoVersion -notlike "go version $requiredGoVersion *") {
+    throw "Unexpected Go toolchain: $actualGoVersion"
+}
+$env:GOTOOLCHAIN = "local"
 $env:PATH = "$javaHomePath\bin;$goBinPath;$(Join-Path $goPath 'bin');$env:PATH"
+Write-Host "Go toolchain: $actualGoVersion"
 
-$coreCommit = "b84b42bc72dd7fad73ee1b3b65bfddf864eacf1b"
-$coreVersionTag = "v1.14.0"
+$coreCommit = "93fff5954390367dd456cad3cbd79be54f8b941f"
+$coreVersionTag = "v1.15.0-alpha.3"
 $coreFetchDepth = 64
-$expectedCoreDescription = "v1.14.0-52-gb84b42b"
+$expectedCoreDescription = "v1.15.0-alpha.3"
 git init $sourceDirectory
 if ($LASTEXITCODE -ne 0) { throw "Unable to initialize the sing-box source tree" }
 git -C $sourceDirectory remote add origin https://github.com/SagerNet/sing-box.git
