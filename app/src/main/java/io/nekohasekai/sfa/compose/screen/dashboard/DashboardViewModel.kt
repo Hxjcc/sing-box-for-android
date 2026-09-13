@@ -17,6 +17,7 @@ import io.nekohasekai.sfa.utils.CommandClient
 import io.nekohasekai.sfa.utils.CommandTarget
 import io.nekohasekai.sfa.utils.ProfileUpdater
 import io.nekohasekai.sfa.utils.RemoteControlManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
@@ -128,6 +131,7 @@ class DashboardViewModel :
     BaseViewModel<DashboardUiState, UiEvent>(),
     CommandClient.Handler {
     private val _serviceStatus = MutableStateFlow(Status.Stopped)
+    private val clashModeSwitchMutex = Mutex()
     val serviceStatus: StateFlow<Status> = _serviceStatus.asStateFlow()
 
     internal val commandClient =
@@ -646,17 +650,28 @@ class DashboardViewModel :
     }
 
     fun selectClashMode(mode: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                CommandTarget.standaloneClient().setClashMode(mode)
-                // Update UI state directly without reconnecting
-                withContext(Dispatchers.Main) {
-                    updateState {
-                        copy(selectedClashMode = mode)
+        viewModelScope.launch {
+            clashModeSwitchMutex.withLock {
+                if (mode == currentState.selectedClashMode) return@withLock
+
+                try {
+                    val closeConnectionsError = withContext(Dispatchers.IO) {
+                        val client = CommandTarget.standaloneClient()
+                        client.setClashMode(mode)
+                        if (Settings.closeConnectionsOnNodeSwitch) {
+                            runCatching { client.closeConnections() }.exceptionOrNull()
+                        } else {
+                            null
+                        }
                     }
+
+                    updateState { copy(selectedClashMode = mode) }
+                    closeConnectionsError?.let(::sendError)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    sendError(e)
                 }
-            } catch (e: Exception) {
-                sendError(e)
             }
         }
     }

@@ -216,8 +216,8 @@
     <string name="android_documentation">Android 文件</string>
     <string name="auto_redirect">自動重定向</string>
     <string name="auto_redirect_description">需要 ROOT 權限</string>
-    <string name="close_connections_on_node_switch">切換節點時關閉連線</string>
-    <string name="close_connections_on_node_switch_description">切換後自動關閉現有連線</string>
+    <string name="close_connections_on_node_switch">切換時關閉連線</string>
+    <string name="close_connections_on_node_switch_description">切換節點或模式時自動關閉</string>
     <string name="rtt_delay_test">RTT 延遲測速</string>
     <string name="rtt_delay_test_description">使用預熱連線測量往返延遲</string>
     <string name="system_http_proxy">系統 HTTP 代理</string>

@@ -213,8 +213,8 @@
     <string name="android_documentation">مستندات Android</string>
     <string name="auto_redirect">تغییر مسیر خودکار</string>
     <string name="auto_redirect_description">نیازمند دسترسی ROOT</string>
-    <string name="close_connections_on_node_switch">بستن اتصال‌ها هنگام تغییر گره</string>
-    <string name="close_connections_on_node_switch_description">بستن اتصال‌های فعال پس از تغییر</string>
+    <string name="close_connections_on_node_switch">بستن اتصال‌ها هنگام تغییر</string>
+    <string name="close_connections_on_node_switch_description">هنگام تغییر گره یا حالت</string>
     <string name="rtt_delay_test">آزمایش تأخیر RTT</string>
     <string name="rtt_delay_test_description">اندازه‌گیری RTT با اتصال گرم‌شده</string>
     <string name="system_http_proxy">پراکسی HTTP سیستم</string>

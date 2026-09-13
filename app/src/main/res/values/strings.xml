@@ -216,8 +216,8 @@
     <string name="android_documentation">Android Documentation</string>
     <string name="auto_redirect">Auto Redirect</string>
     <string name="auto_redirect_description">ROOT permission required</string>
-    <string name="close_connections_on_node_switch">Close connections when switching nodes</string>
-    <string name="close_connections_on_node_switch_description">Close active connections after switching</string>
+    <string name="close_connections_on_node_switch">Close connections on switch</string>
+    <string name="close_connections_on_node_switch_description">Applies to node and mode changes</string>
     <string name="rtt_delay_test">RTT delay test</string>
     <string name="rtt_delay_test_description">Measure RTT using a warmed connection</string>
     <string name="system_http_proxy">System HTTP Proxy</string>
