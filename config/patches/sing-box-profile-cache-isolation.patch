@@ -30,7 +30,7 @@ index 9c30824..dd2daa3 100644
 +	ExcludePackage  []string
  }
  
- func (s *StartedService) newInstance(ctx context.Context, profileContent string, overrideOptions *OverrideOptions) (*Instance, error) {
+ func (s *StartedService) newInstance(ctx context.Context, profileContent string, overrideOptions *OverrideOptions, reloading bool) (*Instance, error) {
 @@ -135,12 +136,16 @@ func (s *StartedService) newInstance(ctx context.Context, profileContent string,
  		return nil, err
  	}
@@ -43,7 +43,7 @@ index 9c30824..dd2daa3 100644
  	i.clashMode = service.PtrFromContext[clashmode.Manager](ctx)
  	i.trafficManager = service.PtrFromContext[trafficcontrol.Manager](ctx)
  	i.pauseManager = service.FromContext[pause.Manager](ctx)
- 	i.registerPauseCallback(ctx)
+ 	i.registerPowerReport(ctx, reloading)
 -	i.cacheFile = service.FromContext[adapter.CacheFile](ctx)
 +	i.cacheFile = cacheFile
  	i.outboundManager = service.FromContext[adapter.OutboundManager](ctx)

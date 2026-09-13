@@ -10,7 +10,7 @@ diff --git a/daemon/instance.go b/daemon/instance.go
  	ExcludePackage []string
  }
  
- func (s *StartedService) newInstance(ctx context.Context, profileContent string, overrideOptions *OverrideOptions) (*Instance, error) {
+ func (s *StartedService) newInstance(ctx context.Context, profileContent string, overrideOptions *OverrideOptions, reloading bool) (*Instance, error) {
 +	urltest.SetRTTEnabled(overrideOptions != nil && overrideOptions.RTTDelayTest)
  	selectedLocale := locale.FromContext(ctx)
  	ctx, _ = locale.ContextWithLocale(s.ctx, selectedLocale.Locale)

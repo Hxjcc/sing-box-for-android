@@ -8,7 +8,7 @@ diff --git a/common/urltest/urltest.go b/common/urltest/urltest.go
 +	"sync/atomic"
  	"time"
  
- 	"github.com/sagernet/sing-box/adapter"
+ 	"github.com/sagernet/sing-anytls"
 @@ -18,6 +19,16 @@ import (
  	"github.com/sagernet/sing/common/observable"
  )
@@ -26,7 +26,7 @@ diff --git a/common/urltest/urltest.go b/common/urltest/urltest.go
  type HistoryStorage struct {
  	access       sync.RWMutex
  	delayHistory map[string]*adapter.URLTestHistory
-@@ -79,6 +90,9 @@ func (s *HistoryStorage) Close() error {
+@@ -82,6 +93,9 @@ func (s *HistoryStorage) Close() error {
  }
  
  func URLTest(ctx context.Context, link string, detour N.Dialer) (uint16, error) {
@@ -35,7 +35,7 @@ diff --git a/common/urltest/urltest.go b/common/urltest/urltest.go
 +	}
  	multiplexOutbound, isMultiplexOutbound := common.Cast[adapter.OutboundWithMultiplex](detour)
  	if isMultiplexOutbound && multiplexOutbound.MultiplexEnabled() {
- 		_, err := urlTest(ctx, link, detour, false)
+ 		warmContext := adapter.ContextWithKeepSession(ctx)
 diff --git a/daemon/started_service.go b/daemon/started_service.go
 --- a/daemon/started_service.go
 +++ b/daemon/started_service.go

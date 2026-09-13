@@ -2,12 +2,17 @@ diff --git a/common/urltest/urltest.go b/common/urltest/urltest.go
 index 36d4495..3b99925 100644
 --- a/common/urltest/urltest.go
 +++ b/common/urltest/urltest.go
-@@ -81,15 +81,19 @@ func (s *HistoryStorage) Close() error {
+@@ -84,20 +84,24 @@ func (s *HistoryStorage) Close() error {
  func URLTest(ctx context.Context, link string, detour N.Dialer) (uint16, error) {
  	multiplexOutbound, isMultiplexOutbound := common.Cast[adapter.OutboundWithMultiplex](detour)
  	if isMultiplexOutbound && multiplexOutbound.MultiplexEnabled() {
--		_, err := urlTest(ctx, link, detour)
-+		_, err := urlTest(ctx, link, detour, false)
+ 		warmContext := adapter.ContextWithKeepSession(ctx)
+ 		warmContext = mux.ContextWithKeepSession(warmContext)
+ 		warmContext = anytls.ContextWithKeepSession(warmContext)
+ 		warmContext = contextWithQUICKeepSession(warmContext)
+ 		warmContext = snell.ContextWithKeepSession(warmContext)
+-		_, err := urlTest(warmContext, link, detour)
++		_, err := urlTest(warmContext, link, detour, false)
  		if err != nil {
  			return 0, err
  		}

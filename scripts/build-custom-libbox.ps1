@@ -72,15 +72,18 @@ $env:ANDROID_NDK_HOME = $androidNdkPath
 $env:GOPATH = $goPath
 $env:GOMODCACHE = $goModuleCache
 $env:GOTOOLCHAIN = "local"
+# The official proxy is pinned here because mirrors can lag behind new
+# pseudo-versions such as the cronet-go builds required by sing-box.
+$env:GOPROXY = "https://proxy.golang.org,direct"
 if ([string]::IsNullOrWhiteSpace($env:GOSUMDB) -or $env:GOSUMDB -eq "off") {
     $env:GOSUMDB = "sum.golang.org"
 }
 $env:PATH = "$javaHomePath\bin;$goBinPath;$(Join-Path $goPath 'bin');$env:PATH"
 
-$coreCommit = "5c41478f1f3d8c1ad14fecb50dd18782a21eb6b8"
+$coreCommit = "b84b42bc72dd7fad73ee1b3b65bfddf864eacf1b"
 $coreVersionTag = "v1.14.0"
 $coreFetchDepth = 64
-$expectedCoreDescription = "v1.14.0-21-g5c41478"
+$expectedCoreDescription = "v1.14.0-52-gb84b42b"
 git init $sourceDirectory
 if ($LASTEXITCODE -ne 0) { throw "Unable to initialize the sing-box source tree" }
 git -C $sourceDirectory remote add origin https://github.com/SagerNet/sing-box.git
@@ -93,12 +96,18 @@ $actualCoreCommit = (git -C $sourceDirectory rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $actualCoreCommit -ne $coreCommit) {
     throw "Unexpected sing-box core commit: $actualCoreCommit"
 }
-$actualCoreDescription = (git -C $sourceDirectory describe --tags).Trim()
+$actualCoreDescription = (git -C $sourceDirectory describe --tags --abbrev=7).Trim()
 if ($LASTEXITCODE -ne 0 -or $actualCoreDescription -ne $expectedCoreDescription) {
     throw "Unexpected sing-box core version: $actualCoreDescription"
 }
 Write-Host "Core source: $actualCoreDescription"
-$baseCoreVersion = $coreVersionTag.TrimStart("v")
+$versionHeading = Get-Content -LiteralPath (Join-Path $sourceDirectory "docs\changelog.md") |
+    Select-String -Pattern '^#### ([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)\s*$' |
+    Select-Object -First 1
+if ($null -eq $versionHeading) {
+    throw "Unable to read the core release version from the pinned source changelog"
+}
+$baseCoreVersion = $versionHeading.Matches[0].Groups[1].Value
 $shortCoreCommit = $actualCoreCommit.Substring(0, 7)
 $embeddedCoreVersion = if ($actualCoreDescription -eq $coreVersionTag) {
     $baseCoreVersion
