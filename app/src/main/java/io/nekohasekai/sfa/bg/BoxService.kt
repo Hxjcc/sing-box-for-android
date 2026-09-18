@@ -36,9 +36,13 @@ import io.nekohasekai.sfa.database.ProfileManager
 import io.nekohasekai.sfa.database.Settings
 import io.nekohasekai.sfa.ktx.hasPermission
 import io.nekohasekai.sfa.vendor.Vendor
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -52,13 +56,10 @@ class BoxService(private val service: Service, private val platformInterface: Pl
 
         private fun profileSelectedCacheID(profileID: Long): String = PROFILE_SELECTED_CACHE_ID_PREFIX + profileID
 
-        fun start() {
-            val intent =
-                runBlocking {
-                    withContext(Dispatchers.IO) {
-                        Intent(Application.application, Settings.serviceClass())
-                    }
-                }
+        @OptIn(DelicateCoroutinesApi::class)
+        fun start() = GlobalScope.launch(Dispatchers.Main.immediate) {
+            Settings.dataStore.initialize()
+            val intent = Intent(Application.application, Settings.serviceClass())
             ContextCompat.startForegroundService(Application.application, intent)
         }
 
@@ -77,6 +78,20 @@ class BoxService(private val service: Service, private val platformInterface: Pl
     private val binder = ServiceBinder(status)
     private val notification = ServiceNotification(status, service)
     private lateinit var commandServer: CommandServer
+    private val idleModeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val idleModeUpdates = Channel<Boolean>(Channel.UNLIMITED)
+
+    init {
+        idleModeScope.launch {
+            for (idle in idleModeUpdates) {
+                if (idle) {
+                    commandServer.pause()
+                } else {
+                    commandServer.wake()
+                }
+            }
+        }
+    }
 
     private var receiverRegistered = false
     private val receiver =
@@ -275,10 +290,8 @@ class BoxService(private val service: Service, private val platformInterface: Pl
 
     @RequiresApi(Build.VERSION_CODES.M)
     private fun serviceUpdateIdleMode() {
-        if (Application.powerManager.isDeviceIdleMode) {
-            commandServer.pause()
-        } else {
-            commandServer.wake()
+        if (::commandServer.isInitialized) {
+            idleModeUpdates.trySend(Application.powerManager.isDeviceIdleMode)
         }
     }
 
@@ -306,6 +319,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
             Libbox.discardPowerReportDraft()
             PowerReportManager.refresh()
             Settings.startedByUser = false
+            Settings.dataStore.flush()
             withContext(Dispatchers.Main) {
                 status.value = Status.Stopped
                 service.stopSelf()
@@ -323,6 +337,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
 
     private suspend fun stopAndAlert(type: Alert, message: String? = null) {
         Settings.startedByUser = false
+        Settings.dataStore.flush()
         val pfd = fileDescriptor
         if (pfd != null) {
             pfd.close()
@@ -384,6 +399,8 @@ class BoxService(private val service: Service, private val platformInterface: Pl
     internal fun onBind(): IBinder = binder
 
     internal fun onDestroy() {
+        idleModeUpdates.cancel()
+        idleModeScope.cancel()
         binder.close()
     }
 
