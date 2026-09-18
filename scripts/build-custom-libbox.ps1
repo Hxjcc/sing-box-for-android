@@ -99,10 +99,10 @@ $env:GOTOOLCHAIN = "local"
 $env:PATH = "$javaHomePath\bin;$goBinPath;$(Join-Path $goPath 'bin');$env:PATH"
 Write-Host "Go toolchain: $actualGoVersion"
 
-$coreCommit = "93fff5954390367dd456cad3cbd79be54f8b941f"
-$coreVersionTag = "v1.15.0-alpha.3"
+$coreCommit = "8330820fa62505f9574e4c35cd969d9af6eb7769"
+$coreVersionTag = "v1.15.0-alpha.6"
 $coreFetchDepth = 64
-$expectedCoreDescription = "v1.15.0-alpha.3"
+$expectedCoreDescription = "v1.15.0-alpha.6"
 git init $sourceDirectory
 if ($LASTEXITCODE -ne 0) { throw "Unable to initialize the sing-box source tree" }
 git -C $sourceDirectory remote add origin https://github.com/SagerNet/sing-box.git
