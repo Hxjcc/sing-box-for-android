@@ -55,7 +55,7 @@ interface PlatformInterfaceWrapper : PlatformInterface {
     }
 
     override fun openTun(options: TunOptions): Int {
-        error("invalid argument")
+        error("android: tun inbound requires VPN service")
     }
 
     override fun useProcFS(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
@@ -111,6 +111,14 @@ interface PlatformInterfaceWrapper : PlatformInterface {
                 networkInterfaces.find { it.name == boxInterface.name } ?: continue
             boxInterface.dnsServer =
                 StringArray(linkProperties.dnsServers.mapNotNull { it.hostAddress }.iterator())
+            boxInterface.dnsSearchDomain =
+                StringArray(
+                    linkProperties.domains
+                        ?.split(' ')
+                        ?.filter { it.isNotEmpty() }
+                        .orEmpty()
+                        .iterator(),
+                )
             boxInterface.gateway =
                 StringArray(
                     linkProperties.routes

@@ -33,19 +33,19 @@ import org.json.JSONArray
 import org.json.JSONException
 import java.util.Collections
 
-enum class CardGroup {
+enum class CardGroup(val pairGroup: CardPairGroup? = null) {
     ClashMode,
-    UploadTraffic,
-    DownloadTraffic,
-    Debug,
-    Connections,
+    UploadTraffic(CardPairGroup.Traffic),
+    DownloadTraffic(CardPairGroup.Traffic),
+    Debug(CardPairGroup.Statistics),
+    Connections(CardPairGroup.Statistics),
     SystemProxy,
     Profiles,
 }
 
-enum class CardWidth {
-    Half,
-    Full,
+enum class CardPairGroup {
+    Traffic,
+    Statistics,
 }
 
 data class DashboardUiState(
@@ -108,16 +108,6 @@ data class DashboardUiState(
             CardGroup.SystemProxy,
             CardGroup.ClashMode,
             CardGroup.Profiles,
-        ),
-    val cardWidths: Map<CardGroup, CardWidth> =
-        mapOf(
-            CardGroup.ClashMode to CardWidth.Full,
-            CardGroup.UploadTraffic to CardWidth.Half,
-            CardGroup.DownloadTraffic to CardWidth.Half,
-            CardGroup.Debug to CardWidth.Half,
-            CardGroup.Connections to CardWidth.Half,
-            CardGroup.SystemProxy to CardWidth.Full,
-            CardGroup.Profiles to CardWidth.Full,
         ),
     val showCardSettingsDialog: Boolean = false,
 ) {
