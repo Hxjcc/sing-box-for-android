@@ -320,15 +320,6 @@ dependencies {
     "otherImplementation"("dev.rikka.shizuku:api:$shizukuVersion")
     "otherImplementation"("dev.rikka.shizuku:provider:$shizukuVersion")
 
-    // libsu for ROOT package query (all flavors)
-    val libsuVersion = "6.0.0"
-    "playImplementation"("com.github.topjohnwu.libsu:core:$libsuVersion")
-    "playImplementation"("com.github.topjohnwu.libsu:service:$libsuVersion")
-    "otherImplementation"("com.github.topjohnwu.libsu:core:$libsuVersion")
-    "otherImplementation"("com.github.topjohnwu.libsu:service:$libsuVersion")
-    "otherLegacyImplementation"("com.github.topjohnwu.libsu:core:$libsuVersion")
-    "otherLegacyImplementation"("com.github.topjohnwu.libsu:service:$libsuVersion")
-
     // Compose dependencies - API 24+ (play/other)
     val composeBom24 = platform("androidx.compose:compose-bom:2026.06.01")
     val activityVersion24 = "1.13.0"
@@ -373,6 +364,7 @@ dependencies {
     "otherLegacyImplementation"("androidx.compose.runtime:runtime-livedata")
 
     // Debug/Test dependencies
+    testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     "androidTestPlayImplementation"(composeBom24)
@@ -393,9 +385,7 @@ dependencies {
     "otherImplementation"("io.github.sagernet:libghostty-android-compose:$libghosttyVersion")
     "otherLegacyImplementation"("io.github.sagernet:libghostty-android-compose-legacy:$libghosttyVersion")
 
-    // Xposed API for self-hooking VPN hide module
-    compileOnly("de.robv.android.xposed:api:82")
-    compileOnly(project(":libxposed-api"))
+
 }
 
 val playCredentialsJSON = rootProject.file("service-account-credentials.json")

@@ -214,8 +214,6 @@
     <string name="allow_bypass">允許繞過 VPN</string>
     <string name="allow_bypass_description">啟用後，應用程式可以繞過此 VPN 連線，直接使用底層網路。</string>
     <string name="android_documentation">Android 文件</string>
-    <string name="auto_redirect">自動重定向</string>
-    <string name="auto_redirect_description">需要 ROOT 權限</string>
     <string name="close_connections_on_node_switch">切換時關閉連線</string>
     <string name="close_connections_on_node_switch_description">切換節點或模式時自動關閉</string>
     <string name="rtt_delay_test">RTT 延遲測速</string>
@@ -256,10 +254,8 @@
     <string name="content_description_app_icon">應用程式圖示</string>
     <string name="per_app_proxy_managed_mode">受管理模式</string>
     <string name="per_app_proxy_managed_mode_description">自動排除中國應用程式</string>
-    <string name="per_app_proxy_package_query_mode">模式</string>
     <string name="per_app_proxy_shizuku_required">透過 Play 商店安裝時，每個應用程式代理需要 Shizuku。Google Play 拒絕允許我們使用 QUERY_ALL_PACKAGES 權限（同時不禁止其他類似應用程式這樣做），而這是列出應用程式清單所必需的。</string>
-    <string name="per_app_proxy_root_required">透過 Play 商店安裝時，每個應用程式代理需要 ROOT。Google Play 拒絕允許我們使用 QUERY_ALL_PACKAGES 權限（同時不禁止其他類似應用程式這樣做），而這是列出應用程式清單所必需的。</string>
-    <string name="privileged_access_required">需要 Root 或 Shizuku 權限來取得完整應用程式清單</string>
+    <string name="privileged_access_required">需要 Shizuku 授權才能取得完整的應用程式清單</string>
 
     <!-- Permissions -->
     <string name="background_permission">背景執行權限</string>
@@ -272,8 +268,6 @@
     <string name="local_network_permission_description">Android 17 及更高版本要求區域網路權限才能存取你的 Wi-Fi 或乙太網路。Android 以附近的裝置的名義請求該權限。</string>
     <string name="notification_permission_title">通知權限</string>
     <string name="notification_permission_required_description">若未授予通知權限，sing-box 無法顯示即時網速。請先授權，或關閉即時網速通知後再啟動服務。</string>
-    <string name="root_access_required">需要 Root 權限</string>
-    <string name="root_access_denied">Root 權限被拒絕</string>
 
     <!-- Updates -->
     <string name="check_update">檢查更新</string>
@@ -317,7 +311,6 @@
     <string name="silent_install_verify_failed">%s 不可用或權限被拒絕</string>
     <string name="install_method_package_installer">PackageInstaller</string>
     <string name="install_method_shizuku">Shizuku</string>
-    <string name="install_method_root">ROOT</string>
     <string name="package_installer_not_available">未授予安裝權限</string>
     <string name="grant_install_permission">授予安裝權限</string>
     <string name="grant_install_permission_description">允許從此來源安裝應用程式</string>
@@ -598,41 +591,7 @@
     <string name="power_report_enable">啟用電源報告</string>
     <string name="power_report_enable_description">每次執行服務都會儲存一份報告</string>
 
-    <!-- Xposed Module -->
-    <string name="xposed_description">sing-box 的特權強化</string>
-    <!-- Privileged Enhancement -->
-    <string name="privilege_settings">特權強化</string>
-    <string name="privilege_module_title">特權模組</string>
-    <string name="privilege_settings_hide_title">隱藏設定</string>
-    <string name="privilege_settings_hide_description">為已選取的應用程式啟用 VPN 偵測防護</string>
-    <string name="privilege_settings_hide_manage">管理</string>
-    <string name="privilege_settings_hide_test">執行測試</string>
-    <string name="privilege_settings_hide_test_result">測試結果</string>
-    <string name="privilege_settings_hide_test_running">正在執行檢測測試…</string>
-    <string name="privilege_settings_hide_test_not_detected">未檢測到</string>
-    <string name="privilege_settings_interface_rename_title">介面重新命名</string>
-    <string name="privilege_settings_interface_prefix">介面前綴</string>
-    <string name="privilege_settings_vpn_detection_title">VPN 檢測</string>
-    <string name="privilege_settings_view_logs">檢視日誌</string>
-    <string name="privilege_settings_export_debug">匯出除錯資訊</string>
-    <string name="privilege_settings_hook_logs_empty">暫無日誌</string>
-    <string name="privilege_settings_export_debug_complete">匯出完成</string>
-    <string name="privilege_settings_export_debug_message">此檔案包含隱私資訊，不應公開分享。大小：%s</string>
-    <string name="privilege_settings_export_debug_failed">匯出除錯資訊失敗：%s</string>
-    <string name="privilege_settings_risky_app_title">警告</string>
-    <string name="privilege_settings_risky_vpn_message_single">此應用程式是 VPN 應用程式，抵抗 VPN 檢測可能造成問題：%1$s</string>
-    <string name="privilege_settings_risky_vpn_message_multi">這些應用程式是 VPN 應用程式，抵抗 VPN 檢測可能造成問題：%1$s</string>
-    <string name="privilege_settings_risky_management_message_single">此應用程式具有網路管理權限，抵抗 VPN 檢測可能造成問題：%1$s</string>
-    <string name="privilege_settings_risky_management_message_multi">這些應用程式具有網路管理權限，抵抗 VPN 檢測可能造成問題：%1$s</string>
-    <string name="privilege_module_restart_action">重新啟動</string>
-    <string name="privilege_module_restart_failed">請求重啟失敗：%1$s</string>
-    <string name="privilege_module_restart_notification_title">需要重啟</string>
-    <string name="privilege_module_restart_notification_message">LSPosed 模組已更新，請重啟以套用變更。</string>
-    <string name="privilege_module_restart_channel">LSPosed 模組</string>
-    <string name="lsposed_module_activated">LSPosed 模組已啟用</string>
-    <string name="lsposed_module_pending_update">LSPosed 模組待更新</string>
-    <string name="lsposed_module_pending_downgrade">LSPosed 模組待降級</string>
-    <string name="lsposed_module_not_activated">LSPosed 模組未啟用</string>
+    <string name="logs_empty">暫無日誌</string>
 
     <!-- Remote Control -->
     <string name="remote_control">遠端控制</string>

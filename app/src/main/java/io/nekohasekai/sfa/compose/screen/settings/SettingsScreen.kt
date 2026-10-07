@@ -49,8 +49,6 @@ import io.nekohasekai.sfa.compose.topbar.LocalScaffoldPadding
 import io.nekohasekai.sfa.compose.topbar.OverrideTopBar
 import io.nekohasekai.sfa.database.Settings
 import io.nekohasekai.sfa.update.UpdateState
-import io.nekohasekai.sfa.utils.HookModuleUpdateNotifier
-import io.nekohasekai.sfa.utils.HookStatusClient
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,13 +62,6 @@ fun SettingsScreen(navController: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val hasUpdate by UpdateState.hasUpdate
-    val hookStatus by HookStatusClient.status.collectAsState()
-    val hasPendingPrivilegeDowngrade = HookModuleUpdateNotifier.isDowngrade(hookStatus)
-    val hasPendingPrivilegeUpdate = HookModuleUpdateNotifier.isUpgrade(hookStatus)
-    LaunchedEffect(Unit) {
-        HookStatusClient.refresh()
-    }
-
     val scaffoldPadding = LocalScaffoldPadding.current
 
     Column(
@@ -215,36 +206,7 @@ fun SettingsScreen(navController: NavController) {
                     ),
                 )
 
-                ListItem(
-                    headlineContent = {
-                        Text(
-                            stringResource(R.string.privilege_settings),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    },
-                    leadingContent = {
-                        Icon(
-                            imageVector = Icons.Outlined.AdminPanelSettings,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                    trailingContent = {
-                        if (hasPendingPrivilegeDowngrade) {
-                            Badge(containerColor = MaterialTheme.colorScheme.error)
-                        } else if (hasPendingPrivilegeUpdate) {
-                            Badge(containerColor = Color(0xFFFFC107))
-                        }
-                    },
-                    modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
-                        .clickable { navController.navigate("settings/privilege") },
-                    colors =
-                    ListItemDefaults.colors(
-                        containerColor = Color.Transparent,
-                    ),
-                )
+
             }
         }
 

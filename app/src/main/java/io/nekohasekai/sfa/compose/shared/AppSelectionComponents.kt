@@ -6,7 +6,6 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -33,16 +32,26 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.nekohasekai.sfa.R
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
+
+private val appIconDispatcher = Dispatchers.IO.limitedParallelism(2)
 
 enum class SortMode {
     NAME,
@@ -68,34 +77,33 @@ class PackageCache(
         get() = packageInfo.requestedPermissions?.contains(Manifest.permission.INTERNET) != true
     val isDisabled: Boolean get() = appInfo.flags and ApplicationInfo.FLAG_INSTALLED == 0
 
-    val applicationIcon by lazy {
+    private val applicationIcon by lazy {
         val drawable = appInfo.loadIcon(packageManager)
-        val bitmap =
-            if (drawable is BitmapDrawable) {
-                drawable.bitmap
-            } else {
-                val imageBitmap =
-                    Bitmap.createBitmap(
-                        drawable.intrinsicWidth.coerceAtLeast(1),
-                        drawable.intrinsicHeight.coerceAtLeast(1),
-                        Bitmap.Config.ARGB_8888,
-                    )
-                val canvas = Canvas(imageBitmap)
-                drawable.setBounds(0, 0, canvas.width, canvas.height)
-                drawable.draw(canvas)
-                imageBitmap
-            }
+        // Cache only the 40 dp displayed by AppSelectionCard, not the full launcher icon.
+        val size = (40 * android.content.res.Resources.getSystem().displayMetrics.density).roundToInt().coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val originalBounds = android.graphics.Rect(drawable.bounds)
+        try {
+            drawable.setBounds(0, 0, size, size)
+            drawable.draw(canvas)
+        } finally {
+            drawable.bounds = originalBounds
+        }
+        bitmap.prepareToDraw()
         bitmap.asImageBitmap()
     }
 
+    suspend fun loadIcon(): ImageBitmap = withContext(appIconDispatcher) { applicationIcon }
+
     val applicationLabel by lazy {
-        appInfo.loadLabel(packageManager).toString()
+        runCatching { appInfo.loadLabel(packageManager).toString() }.getOrDefault(packageName)
     }
 
     val info: PackageInfo get() = packageInfo
 }
 
-fun buildDisplayPackages(
+suspend fun buildDisplayPackages(
     packages: List<PackageCache>,
     selectedUids: Set<Int> = emptySet(),
     selectedFirst: Boolean = false,
@@ -118,6 +126,11 @@ fun buildDisplayPackages(
             }
             true
         }
+    // Only load labels for apps that will be displayed, including non-name sort modes.
+    for (packageCache in displayPackages) {
+        currentCoroutineContext().ensureActive()
+        packageCache.applicationLabel
+    }
     val sortComparator =
         Comparator<PackageCache> { left, right ->
             if (selectedFirst) {
@@ -154,6 +167,15 @@ fun AppSelectionCard(
     onCopyPackage: (() -> Unit)? = null,
     onCopyUid: (() -> Unit)? = null,
 ) {
+    val applicationIcon by produceState<ImageBitmap?>(null, packageCache) {
+        value = try {
+            packageCache.loadIcon()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
     var showContextMenu by remember { mutableStateOf(false) }
     var showCopyMenu by remember { mutableStateOf(false) }
     val cardShape = MaterialTheme.shapes.medium
@@ -187,11 +209,16 @@ fun AppSelectionCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Image(
-                    bitmap = packageCache.applicationIcon,
-                    contentDescription = stringResource(R.string.content_description_app_icon),
-                    modifier = Modifier.size(40.dp),
-                )
+                val icon = applicationIcon
+                if (icon != null) {
+                    Image(
+                        bitmap = icon,
+                        contentDescription = stringResource(R.string.content_description_app_icon),
+                        modifier = Modifier.size(40.dp),
+                    )
+                } else {
+                    Box(Modifier.size(40.dp))
+                }
                 Column(
                     modifier = Modifier.weight(1f),
                 ) {

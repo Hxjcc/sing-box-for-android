@@ -8,7 +8,6 @@ import androidx.camera.core.ImageAnalysis
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.nekohasekai.sfa.Application
 import io.nekohasekai.sfa.R
-import io.nekohasekai.sfa.bg.RootClient
 import io.nekohasekai.sfa.compose.screen.qrscan.QRCodeCropArea
 import io.nekohasekai.sfa.database.Settings
 import io.nekohasekai.sfa.update.UpdateCheckException
@@ -110,7 +109,6 @@ object Vendor : VendorInterface {
         "PACKAGE_INSTALLER" -> {
             ApkInstaller.canSystemSilentInstall()
         }
-        "ROOT" -> RootClient.checkRootAvailable()
         else -> false
     }
 

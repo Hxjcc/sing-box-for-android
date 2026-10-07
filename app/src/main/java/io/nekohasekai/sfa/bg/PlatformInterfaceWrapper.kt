@@ -1,12 +1,8 @@
 package io.nekohasekai.sfa.bg
 
 import android.annotation.SuppressLint
-import android.content.Intent
 import android.net.NetworkCapabilities
 import android.os.Build
-import android.os.DeadObjectException
-import android.os.IBinder
-import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.provider.Settings
 import android.system.OsConstants
@@ -20,7 +16,6 @@ import io.nekohasekai.libbox.ConnectionOwner
 import io.nekohasekai.libbox.InterfaceUpdateListener
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.LocalDNSTransport
-import io.nekohasekai.libbox.NeighborEntryIterator
 import io.nekohasekai.libbox.NeighborUpdateListener
 import io.nekohasekai.libbox.NetworkInterfaceIterator
 import io.nekohasekai.libbox.PlatformInterface
@@ -30,7 +25,6 @@ import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.libbox.TunOptions
 import io.nekohasekai.libbox.WIFIState
 import io.nekohasekai.sfa.Application
-import io.nekohasekai.sfa.constant.Action
 import io.nekohasekai.sfa.ktx.toList
 import io.nekohasekai.sfa.ktx.toStringIterator
 import kotlinx.coroutines.Dispatchers
@@ -43,10 +37,8 @@ import java.net.NetworkInterface
 import java.security.KeyStore
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
-import io.nekohasekai.libbox.NeighborEntry as LibboxNeighborEntry
 import io.nekohasekai.libbox.NetworkInterface as LibboxNetworkInterface
 
-private var neighborCallback: INeighborTableCallback.Stub? = null
 
 interface PlatformInterfaceWrapper : PlatformInterface {
     override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
@@ -194,42 +186,11 @@ interface PlatformInterfaceWrapper : PlatformInterface {
 
     override fun localDNSTransport(): LocalDNSTransport? = LocalResolver
 
-    override fun startNeighborMonitor(listener: NeighborUpdateListener?) {
-        if (listener == null) return
-        val callback = object : INeighborTableCallback.Stub() {
-            override fun onNeighborTableUpdated(entries: ParceledListSlice<*>?) {
-                if (entries == null) return
-                @Suppress("UNCHECKED_CAST")
-                val list = entries.list as List<NeighborEntry>
-                listener.updateNeighborTable(
-                    NeighborEntryArray(
-                        list.map { entry ->
-                            LibboxNeighborEntry().apply {
-                                address = entry.address
-                                macAddress = entry.macAddress
-                                hostname = entry.hostname
-                            }
-                        }.iterator(),
-                    ),
-                )
-            }
-        }
-        neighborCallback = callback
-        runBlocking(Dispatchers.IO) {
-            RootClient.registerNeighborTableCallback(callback)
-        }
-    }
+    override fun startNeighborMonitor(listener: NeighborUpdateListener?) {}
 
     override fun usePlatformShell(): Boolean = true
 
-    override fun checkPlatformShell() {
-        val available = RootClient.rootAvailable.value ?: runBlocking(Dispatchers.IO) {
-            RootClient.checkRootAvailable()
-        }
-        if (!available) {
-            error("missing root permission")
-        }
-    }
+    override fun checkPlatformShell() {}
 
     override fun openShellSession(
         user: PlatformUser?,
@@ -277,26 +238,14 @@ interface PlatformInterfaceWrapper : PlatformInterface {
                 )
             }
         }
-        val rootSession = runBlocking(Dispatchers.IO) {
-            RootClient.openShellSession(
-                user.username,
-                command,
-                envList.toTypedArray(),
-                term,
-                rows,
-                cols,
-            )
-        }
-        return RootShellSessionWrapper(rootSession)
+        error("Switching shell users is not supported in this build")
     }
 
     override fun readSystemSSHHostKey(): String {
         error("not supported")
     }
 
-    override fun lookupSFTPServer(): String = runBlocking(Dispatchers.IO) {
-        RootClient.lookupSFTPServer()
-    }
+    override fun lookupSFTPServer(): String = error("SFTP server is not available in this build")
 
     override fun tailscaleHostname(): String = Settings.Global.getString(
         Application.application.contentResolver,
@@ -304,111 +253,14 @@ interface PlatformInterfaceWrapper : PlatformInterface {
     )?.takeIf { it.isNotBlank() }
         ?: "${Build.MANUFACTURER} ${Build.MODEL}"
 
-    override fun usePlatformBridge(): Boolean = RootClient.rootAvailable.value ?: runBlocking(Dispatchers.IO) {
-        RootClient.checkRootAvailable()
-    }
+    override fun usePlatformBridge(): Boolean = false
 
-    override fun createBridge(options: BridgeOptions?): BridgeSession {
-        options!!
-        val session = runBlocking(Dispatchers.IO) {
-            RootClient.openBridge(
-                options.bridgeName,
-                options.mtu,
-                options.inet4Port,
-                options.inet6Port,
-                options.ruleIndex,
-                options.routeTable,
-            )
-        }
-        return RootBridgeSessionWrapper(session)
-    }
+    override fun createBridge(options: BridgeOptions?): BridgeSession = error("Platform bridge is not supported in this build")
 
-    override fun usePlatformAutoRedirect(): Boolean = RootClient.rootAvailable.value ?: runBlocking(Dispatchers.IO) {
-        RootClient.checkRootAvailable()
-    }
+    override fun usePlatformAutoRedirect(): Boolean = false
 
-    override fun createAutoRedirect(options: ByteArray?, handler: AutoRedirectHandler?): AutoRedirectSession {
-        options!!
-        handler!!
-        val binderHandler = object : IAutoRedirectHandler.Stub() {
-            override fun judgeFlow(
-                ipProtocol: Int,
-                sourceAddress: String?,
-                sourcePort: Int,
-                destinationAddress: String?,
-                destinationPort: Int,
-                firstPacket: ByteArray?,
-            ): Int = try {
-                handler.judgeFlow(
-                    ipProtocol,
-                    sourceAddress,
-                    sourcePort,
-                    destinationAddress,
-                    destinationPort,
-                    firstPacket,
-                )
-            } catch (e: Exception) {
-                throw IllegalStateException(e.message ?: e.toString())
-            }
-
-            override fun writeLog(level: Int, message: String?) {
-                handler.writeLog(level, message)
-            }
-
-            // Binder only marshals a handful of exception types; a Go error escaping here
-            // reaches the root service as a bare failure without the message, so it is
-            // converted to IllegalStateException.
-            override fun getRedirectListener(): ParcelFileDescriptor = try {
-                ParcelFileDescriptor.adoptFd(handler.redirectListenerFileDescriptor())
-            } catch (e: Exception) {
-                throw IllegalStateException(e.message ?: e.toString())
-            }
-
-            override fun getRouteAddressSet(): ParcelFileDescriptor = try {
-                ParcelFileDescriptor.adoptFd(handler.routeAddressSetFileDescriptor())
-            } catch (e: Exception) {
-                throw IllegalStateException(e.message ?: e.toString())
-            }
-        }
-        val session = runBlocking(Dispatchers.IO) {
-            RootClient.startAutoRedirect(options, binderHandler)
-        }
-        return RootAutoRedirectSessionWrapper(session)
-    }
-
-    // Without a bypass flag on the queue rules, a root process dying while the
-    // VPN is up leaves every new flow of VPN apps dropped in the kernel, so the
-    // service is stopped instead of running with a dead network.
-    private class RootAutoRedirectSessionWrapper(
-        private val session: IAutoRedirectSession,
-    ) : AutoRedirectSession,
-        IBinder.DeathRecipient {
-        init {
-            session.asBinder().linkToDeath(this, 0)
-        }
-
-        override fun binderDied() {
-            Log.e("PlatformInterface", "auto-redirect root service died, stopping service")
-            Application.application.sendBroadcast(
-                Intent(Action.SERVICE_CLOSE).setPackage(Application.application.packageName),
-            )
-        }
-
-        override fun close() {
-            try {
-                session.asBinder().unlinkToDeath(this, 0)
-            } catch (_: NoSuchElementException) {
-            }
-            try {
-                session.close()
-            } catch (_: DeadObjectException) {
-            }
-        }
-
-        override fun updateRouteAddressSet() {
-            session.updateRouteAddressSet()
-        }
-    }
+    override fun createAutoRedirect(options: ByteArray?, handler: AutoRedirectHandler?): AutoRedirectSession =
+        error("Auto redirect is not supported in this build")
 
     override fun lookupUser(username: String?): io.nekohasekai.libbox.PlatformUser {
         val resolved = UserResolver.resolve(Application.packageManager, username!!)
@@ -423,60 +275,7 @@ interface PlatformInterfaceWrapper : PlatformInterface {
     override fun registerMyInterface(name: String?) {
     }
 
-    override fun closeNeighborMonitor(listener: NeighborUpdateListener?) {
-        val callback = neighborCallback ?: return
-        neighborCallback = null
-        runBlocking(Dispatchers.IO) {
-            RootClient.unregisterNeighborTableCallback(callback)
-        }
-    }
-
-    private class RootBridgeSessionWrapper(
-        private val session: IBridgeSession,
-    ) : BridgeSession {
-        override fun fileDescriptor(): Int = session.fileDescriptor.detachFd()
-
-        override fun name(): String = session.name
-
-        override fun inet6Active(): Boolean = session.isInet6Active
-
-        override fun setEgress(interfaceName: String?) {
-            session.setEgress(interfaceName ?: "")
-        }
-
-        override fun close() {
-            session.close()
-        }
-    }
-
-    private class RootShellSessionWrapper(
-        private val rootSession: IRootShellSession,
-    ) : ShellSession {
-        private val masterPfd: ParcelFileDescriptor = rootSession.masterFD
-
-        override fun masterFD(): Int = masterPfd.fd
-
-        override fun resize(rows: Int, cols: Int) {
-            rootSession.resize(rows, cols)
-        }
-
-        override fun signal(signal: Int) {
-            rootSession.signal(signal)
-        }
-
-        override fun waitExit(): Int = rootSession.waitFor()
-
-        override fun close() {
-            masterPfd.close()
-            rootSession.close()
-        }
-    }
-
-    private class NeighborEntryArray(private val iterator: Iterator<LibboxNeighborEntry>) : NeighborEntryIterator {
-        override fun hasNext(): Boolean = iterator.hasNext()
-
-        override fun next(): LibboxNeighborEntry = iterator.next()
-    }
+    override fun closeNeighborMonitor(listener: NeighborUpdateListener?) {}
 
     private class InterfaceArray(private val iterator: Iterator<LibboxNetworkInterface>) : NetworkInterfaceIterator {
         override fun hasNext(): Boolean = iterator.hasNext()

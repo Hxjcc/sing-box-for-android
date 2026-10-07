@@ -19,7 +19,6 @@ object UserResolver {
     const val TERMUX_HOME = "/data/data/com.termux/files/home"
 
     fun resolve(pm: PackageManager, username: String): ResolvedUser = when (username) {
-        "root" -> ResolvedUser("root", Process.ROOT_UID, Process.ROOT_UID, "/")
         "shell" -> ResolvedUser("shell", Process.SHELL_UID, Process.SHELL_UID, "/data/local")
         "termux" -> resolvePackage(pm, TERMUX_PACKAGE)
         "sing-box" -> resolvePackage(pm, BuildConfig.APPLICATION_ID)

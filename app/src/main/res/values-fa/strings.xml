@@ -211,8 +211,6 @@
     <string name="allow_bypass">اجازه دور زدن VPN</string>
     <string name="allow_bypass_description">در صورت فعال بودن، برنامه‌ها می‌توانند این اتصال VPN را دور بزنند و مستقیماً از شبکه اصلی استفاده کنند.</string>
     <string name="android_documentation">مستندات Android</string>
-    <string name="auto_redirect">تغییر مسیر خودکار</string>
-    <string name="auto_redirect_description">نیازمند دسترسی ROOT</string>
     <string name="close_connections_on_node_switch">بستن اتصال‌ها هنگام تغییر</string>
     <string name="close_connections_on_node_switch_description">هنگام تغییر گره یا حالت</string>
     <string name="rtt_delay_test">آزمایش تأخیر RTT</string>
@@ -253,10 +251,7 @@
     <string name="content_description_app_icon">آیکن برنامه</string>
     <string name="per_app_proxy_managed_mode">حالت مدیریت‌شده</string>
     <string name="per_app_proxy_managed_mode_description">برنامه‌های چینی را خودکار مستثنی کن</string>
-    <string name="per_app_proxy_package_query_mode">حالت</string>
     <string name="per_app_proxy_shizuku_required">وقتی از Play Store نصب می‌شود، پراکسی هر برنامه به Shizuku نیاز دارد. Google Play اجازه استفاده از مجوز QUERY_ALL_PACKAGES را به ما نمی‌دهد (در حالی که برنامه‌های مشابه دیگر را منع نمی‌کند) و این مجوز برای فهرست کردن برنامه‌ها لازم است.</string>
-    <string name="per_app_proxy_root_required">وقتی از Play Store نصب می‌شود، پراکسی هر برنامه به ROOT نیاز دارد. Google Play اجازه استفاده از مجوز QUERY_ALL_PACKAGES را به ما نمی‌دهد (در حالی که برنامه‌های مشابه دیگر را منع نمی‌کند) و این مجوز برای فهرست کردن برنامه‌ها لازم است.</string>
-    <string name="privileged_access_required">برای دریافت فهرست کامل برنامه‌ها به دسترسی Root یا Shizuku نیاز است</string>
 
     <!-- Permissions -->
     <string name="background_permission">مجوز پس‌زمینه</string>
@@ -267,8 +262,6 @@
     <string name="location_permission_background_description">در Android 10 و بالاتر، مجوز &lt;strong&gt;موقعیت مکانی پس‌زمینه&lt;/strong&gt; لازم است. برای اعطای مجوز، گزینه &lt;strong&gt;اجازه دائمی&lt;/strong&gt; را انتخاب کنید.</string>
     <string name="notification_permission_title">مجوز اعلان</string>
     <string name="notification_permission_required_description">بدون مجوز اعلان، sing-box نمی‌تواند سرعت لحظه‌ای شبکه را نمایش دهد. لطفا پیش از شروع سرویس، مجوز را بدهید یا اعلان سرعت لحظه‌ای شبکه را غیرفعال کنید.</string>
-    <string name="root_access_required">دسترسی Root لازم است</string>
-    <string name="root_access_denied">دسترسی Root رد شد</string>
 
     <!-- Updates -->
     <string name="check_update">بررسی به‌روزرسانی</string>
@@ -312,7 +305,6 @@
     <string name="silent_install_verify_failed">%s در دسترس نیست یا دسترسی رد شده است</string>
     <string name="install_method_package_installer">PackageInstaller</string>
     <string name="install_method_shizuku">Shizuku</string>
-    <string name="install_method_root">ROOT</string>
     <string name="package_installer_not_available">مجوز نصب داده نشده است</string>
     <string name="grant_install_permission">اعطای مجوز نصب</string>
     <string name="grant_install_permission_description">اجازه نصب برنامه از این منبع</string>
@@ -591,42 +583,8 @@
     <string name="power_report_enable">فعال‌سازی گزارش مصرف انرژی</string>
     <string name="power_report_enable_description">آمار زمان پردازنده، بیدارسازی و ترافیک سرویس را ثبت می‌کند. برای هر اجرای سرویس یک گزارش ذخیره می‌شود.</string>
 
-    <!-- Xposed Module -->
-    <string name="xposed_description">بهبود دسترسی ویژه برای sing-box</string>
 
-    <!-- Privileged Enhancement -->
-    <string name="privilege_module_title">ماژول‌های دسترسی ویژه</string>
-    <string name="lsposed_module_activated">ماژول LSPosed فعال است</string>
-    <string name="lsposed_module_pending_update">به‌روزرسانی ماژول LSPosed در انتظار است</string>
-    <string name="lsposed_module_pending_downgrade">دانگرید ماژول LSPosed در انتظار است</string>
-    <string name="lsposed_module_not_activated">ماژول LSPosed فعال نیست</string>
-    <string name="privilege_settings">بهبود دسترسی ویژه</string>
-    <string name="privilege_settings_hide_title">پنهان‌سازی تنظیمات</string>
-    <string name="privilege_settings_hide_description">مقاومت در برابر تشخیص VPN برای برنامه‌های انتخاب‌شده</string>
-    <string name="privilege_settings_hide_manage">مدیریت</string>
-    <string name="privilege_settings_hide_test">اجرای تست</string>
-    <string name="privilege_settings_hide_test_result">نتیجه تست</string>
-    <string name="privilege_settings_hide_test_running">در حال اجرای تست‌های تشخیص…</string>
-    <string name="privilege_settings_hide_test_not_detected">تشخیص داده نشد</string>
-    <string name="privilege_settings_interface_rename_title">تغییر نام رابط</string>
-    <string name="privilege_settings_interface_prefix">پیشوند رابط</string>
-    <string name="privilege_settings_vpn_detection_title">تشخیص VPN</string>
-    <string name="privilege_settings_view_logs">مشاهده لاگ‌ها</string>
-    <string name="privilege_settings_export_debug">خروجی گرفتن اطلاعات اشکال‌زدایی</string>
-    <string name="privilege_settings_hook_logs_empty">لاگی وجود ندارد</string>
-    <string name="privilege_settings_export_debug_complete">خروجی‌گیری کامل شد</string>
-    <string name="privilege_settings_export_debug_message">این فایل حاوی اطلاعات خصوصی است و نباید عمومی به اشتراک گذاشته شود. اندازه: %s</string>
-    <string name="privilege_settings_export_debug_failed">خروجی گرفتن اطلاعات اشکال‌زدایی ناموفق بود: %s</string>
-    <string name="privilege_settings_risky_app_title">هشدار</string>
-    <string name="privilege_settings_risky_vpn_message_single">این برنامه یک برنامه VPN است. مقاومت در برابر تشخیص VPN ممکن است مشکل ایجاد کند: %1$s</string>
-    <string name="privilege_settings_risky_vpn_message_multi">این برنامه‌ها VPN هستند. مقاومت در برابر تشخیص VPN ممکن است مشکل ایجاد کند: %1$s</string>
-    <string name="privilege_settings_risky_management_message_single">این برنامه مجوز مدیریت شبکه دارد. مقاومت در برابر تشخیص VPN ممکن است مشکل ایجاد کند: %1$s</string>
-    <string name="privilege_settings_risky_management_message_multi">این برنامه‌ها مجوز مدیریت شبکه دارند. مقاومت در برابر تشخیص VPN ممکن است مشکل ایجاد کند: %1$s</string>
-    <string name="privilege_module_restart_action">راه‌اندازی مجدد</string>
-    <string name="privilege_module_restart_failed">درخواست راه‌اندازی مجدد ناموفق بود: %1$s</string>
-    <string name="privilege_module_restart_notification_title">نیاز به راه‌اندازی مجدد</string>
-    <string name="privilege_module_restart_notification_message">ماژول LSPosed به‌روزرسانی شد. برای اعمال تغییرات دستگاه را راه‌اندازی مجدد کنید.</string>
-    <string name="privilege_module_restart_channel">ماژول LSPosed</string>
+    <string name="logs_empty">لاگی وجود ندارد</string>
 
     <!-- Remote Control -->
     <string name="remote_control">کنترل از راه دور</string>

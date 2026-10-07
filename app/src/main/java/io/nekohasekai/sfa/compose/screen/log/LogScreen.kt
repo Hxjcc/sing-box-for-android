@@ -69,6 +69,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -125,6 +126,10 @@ fun LogScreen(
     onBack: (() -> Unit)? = null,
 ) {
     val resolvedViewModel = viewModel ?: viewModel<LogViewModel>()
+    DisposableEffect(resolvedViewModel) {
+        (resolvedViewModel as? LogViewModel)?.setVisible(true)
+        onDispose { (resolvedViewModel as? LogViewModel)?.setVisible(false) }
+    }
     val uiState by resolvedViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
@@ -134,7 +139,7 @@ fun LogScreen(
     val resolvedTitle = title ?: stringResource(R.string.title_log)
     val remoteServer by RemoteControlManager.remoteServer.collectAsState()
     val remoteServers by rememberRemoteServers()
-    val emptyStateMessage = emptyMessage ?: stringResource(R.string.privilege_settings_hook_logs_empty)
+    val emptyStateMessage = emptyMessage ?: stringResource(R.string.logs_empty)
 
     OverrideTopBar {
         TopAppBar(

@@ -156,7 +156,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
                 commandServer.startOrReloadService(
                     content,
                     OverrideOptions().apply {
-                        autoRedirect = Settings.autoRedirect
+                        autoRedirect = false
                         selectedCacheID = profileSelectedCacheID(profile.id)
                         rttDelayTest = Settings.rttDelayTest
                         if (Vendor.isPerAppProxyAvailable() && Settings.perAppProxyEnabled) {
@@ -240,7 +240,7 @@ class BoxService(private val service: Service, private val platformInterface: Pl
             commandServer.startOrReloadService(
                 content,
                 OverrideOptions().apply {
-                    autoRedirect = Settings.autoRedirect
+                    autoRedirect = false
                     selectedCacheID = profileSelectedCacheID(profile.id)
                     rttDelayTest = Settings.rttDelayTest
                     if (Vendor.isPerAppProxyAvailable() && Settings.perAppProxyEnabled) {

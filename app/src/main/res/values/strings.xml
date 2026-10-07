@@ -214,8 +214,6 @@
     <string name="allow_bypass">Allow Bypass</string>
     <string name="allow_bypass_description">If enabled, applications can bypass this VPN connection and instead use the underlying network directly.</string>
     <string name="android_documentation">Android Documentation</string>
-    <string name="auto_redirect">Auto Redirect</string>
-    <string name="auto_redirect_description">ROOT permission required</string>
     <string name="close_connections_on_node_switch">Close connections on switch</string>
     <string name="close_connections_on_node_switch_description">Applies to node and mode changes</string>
     <string name="rtt_delay_test">RTT delay test</string>
@@ -256,10 +254,8 @@
     <string name="content_description_app_icon">App icon</string>
     <string name="per_app_proxy_managed_mode">Managed Mode</string>
     <string name="per_app_proxy_managed_mode_description">Automatically Exclude China apps</string>
-    <string name="per_app_proxy_package_query_mode">Mode</string>
     <string name="per_app_proxy_shizuku_required">When installed from the Play Store, per-app proxy requires Shizuku. Google Play refuses to allow us to use the QUERY_ALL_PACKAGES permission (while not prohibiting other similar apps from doing so), which is required for listing apps.</string>
-    <string name="per_app_proxy_root_required">When installed from the Play Store, per-app proxy requires ROOT. Google Play refuses to allow us to use the QUERY_ALL_PACKAGES permission (while not prohibiting other similar apps from doing so), which is required for listing apps.</string>
-    <string name="privileged_access_required">Root or Shizuku access required to get the complete app list</string>
+    <string name="privileged_access_required">Shizuku authorization is required to get the complete app list</string>
 
     <!-- Permissions -->
     <string name="background_permission">Background permission</string>
@@ -272,8 +268,6 @@
     <string name="local_network_permission_description">Android 17 and later versions require the local network permission to access your Wi-Fi or Ethernet network. Android requests it as nearby devices.</string>
     <string name="notification_permission_title">Notification permission</string>
     <string name="notification_permission_required_description">sing-box is unable to show real-time network speeds without the permission to send notifications. Please grant the permission or disable real-time network speeds notification before starting the service.</string>
-    <string name="root_access_required">Root access required</string>
-    <string name="root_access_denied">Root access denied</string>
 
     <!-- Updates -->
     <string name="check_update">Check Update</string>
@@ -317,7 +311,6 @@
     <string name="silent_install_verify_failed">%s is not available or permission denied</string>
     <string name="install_method_package_installer">PackageInstaller</string>
     <string name="install_method_shizuku">Shizuku</string>
-    <string name="install_method_root">ROOT</string>
     <string name="package_installer_not_available">Install permission not granted</string>
     <string name="grant_install_permission">Grant Install Permission</string>
     <string name="grant_install_permission_description">Allow installing apps from this source</string>
@@ -627,42 +620,8 @@
     <string name="power_report_enable">Enable Power Report</string>
     <string name="power_report_enable_description">A report is saved for each service run</string>
 
-    <!-- Xposed Module -->
-    <string name="xposed_description">Privileged Enhancement for sing-box</string>
 
-    <!-- Privileged Enhancement -->
-    <string name="privilege_module_title">Privilege modules</string>
-    <string name="lsposed_module_activated">LSPosed module activated</string>
-    <string name="lsposed_module_pending_update">LSPosed module update pending</string>
-    <string name="lsposed_module_pending_downgrade">LSPosed module downgrade pending</string>
-    <string name="lsposed_module_not_activated">LSPosed module not activated</string>
-    <string name="privilege_settings">Privileged Enhancement</string>
-    <string name="privilege_settings_hide_title">Hide Settings</string>
-    <string name="privilege_settings_hide_description">Resist VPN detection for selected apps</string>
-    <string name="privilege_settings_hide_manage">Manage</string>
-    <string name="privilege_settings_hide_test">Run Test</string>
-    <string name="privilege_settings_hide_test_result">Test Result</string>
-    <string name="privilege_settings_hide_test_running">Running detection tests…</string>
-    <string name="privilege_settings_hide_test_not_detected">Not detected</string>
-    <string name="privilege_settings_interface_rename_title">Interface Rename</string>
-    <string name="privilege_settings_interface_prefix">Interface prefix</string>
-    <string name="privilege_settings_vpn_detection_title">VPN Detection</string>
-    <string name="privilege_settings_view_logs">View logs</string>
-    <string name="privilege_settings_export_debug">Export debug info</string>
-    <string name="privilege_settings_hook_logs_empty">No logs</string>
-    <string name="privilege_settings_export_debug_complete">Export complete</string>
-    <string name="privilege_settings_export_debug_message">This file contains private information and should not be shared publicly. Size: %s</string>
-    <string name="privilege_settings_export_debug_failed">Failed to export debug info: %s</string>
-    <string name="privilege_settings_risky_app_title">Warning</string>
-    <string name="privilege_settings_risky_vpn_message_single">This app is a VPN app. Resisting VPN detection may cause issues: %1$s</string>
-    <string name="privilege_settings_risky_vpn_message_multi">These apps are VPN apps. Resisting VPN detection may cause issues: %1$s</string>
-    <string name="privilege_settings_risky_management_message_single">This app has network management permissions. Resisting VPN detection may cause issues: %1$s</string>
-    <string name="privilege_settings_risky_management_message_multi">These apps have network management permissions. Resisting VPN detection may cause issues: %1$s</string>
-    <string name="privilege_module_restart_action">Restart</string>
-    <string name="privilege_module_restart_failed">Failed to request reboot: %1$s</string>
-    <string name="privilege_module_restart_notification_title">Reboot required</string>
-    <string name="privilege_module_restart_notification_message">LSPosed module updated. Reboot to apply changes.</string>
-    <string name="privilege_module_restart_channel">LSPosed Module</string>
+    <string name="logs_empty">No logs</string>
 
     <!-- Remote Control -->
     <string name="remote_control">Remote Control</string>

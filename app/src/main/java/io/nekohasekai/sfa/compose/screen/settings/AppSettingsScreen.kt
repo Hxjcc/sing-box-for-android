@@ -109,9 +109,7 @@ import io.nekohasekai.sfa.update.UpdateCheckException
 import io.nekohasekai.sfa.update.UpdateSource
 import io.nekohasekai.sfa.update.UpdateState
 import io.nekohasekai.sfa.update.UpdateTrack
-import io.nekohasekai.sfa.utils.HookStatusClient
 import io.nekohasekai.sfa.vendor.Vendor
-import io.nekohasekai.sfa.xposed.XposedActivation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -157,8 +155,6 @@ fun AppSettingsScreen(
 
     var silentInstallEnabled by remember { mutableStateOf(Settings.silentInstallEnabled) }
     var silentInstallMethod by remember { mutableStateOf(Settings.silentInstallMethod) }
-    val systemHookStatus by HookStatusClient.status.collectAsState()
-    val xposedActivated = systemHookStatus?.active == true || XposedActivation.isActivated(context)
     var isMethodAvailable by remember { mutableStateOf(true) }
     var autoUpdateEnabled by remember { mutableStateOf(Settings.autoUpdateEnabled) }
     var showInstallMethodMenu by remember { mutableStateOf(false) }
@@ -197,13 +193,11 @@ fun AppSettingsScreen(
     }
 
     LaunchedEffect(Unit) {
-        HookStatusClient.refresh()
         refreshCacheSize()
     }
 
     // Re-check states when returning from background (e.g., after granting permission)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        HookStatusClient.refresh()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Application.notification.createNotificationChannel(
                 NotificationChannel(
@@ -1111,16 +1105,11 @@ fun AppSettingsScreen(
                             },
                             supportingContent = {
                                 Text(
-                                    if (xposedActivated) {
-                                        stringResource(R.string.install_method_root)
-                                    } else {
                                         when (silentInstallMethod) {
                                             "PACKAGE_INSTALLER" -> stringResource(R.string.install_method_package_installer)
                                             "SHIZUKU" -> stringResource(R.string.install_method_shizuku)
-                                            "ROOT" -> stringResource(R.string.install_method_root)
                                             else -> silentInstallMethod
-                                        }
-                                    },
+                                        },
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
                             },
@@ -1133,7 +1122,7 @@ fun AppSettingsScreen(
                             },
                             modifier =
                             updateItemModifier()
-                                .let { if (!xposedActivated) it.clickable { showInstallMethodMenu = true } else it },
+                                .clickable { showInstallMethodMenu = true },
                             colors =
                             ListItemDefaults.colors(
                                 containerColor = Color.Transparent,
@@ -1634,7 +1623,6 @@ private fun InstallMethodDialog(
             add("PACKAGE_INSTALLER" to stringResource(R.string.install_method_package_installer))
         }
         add("SHIZUKU" to stringResource(R.string.install_method_shizuku))
-        add("ROOT" to stringResource(R.string.install_method_root))
     }
 
     AlertDialog(

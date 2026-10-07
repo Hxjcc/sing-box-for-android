@@ -9,7 +9,6 @@ import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -113,15 +112,13 @@ import io.nekohasekai.sfa.compose.component.ServiceStatusBar
 import io.nekohasekai.sfa.compose.component.SnackbarHost
 import io.nekohasekai.sfa.compose.component.UpdateAvailableDialog
 import io.nekohasekai.sfa.compose.component.UptimeText
-import io.nekohasekai.sfa.compose.model.Connection
 import io.nekohasekai.sfa.compose.navigation.NavHost
 import io.nekohasekai.sfa.compose.navigation.NewProfileArgs
 import io.nekohasekai.sfa.compose.navigation.ProfileRoutes
 import io.nekohasekai.sfa.compose.navigation.Screen
 import io.nekohasekai.sfa.compose.navigation.bottomNavigationScreens
 import io.nekohasekai.sfa.compose.screen.configuration.ProfileImportHandler
-import io.nekohasekai.sfa.compose.screen.connections.ConnectionDetailsScreen
-import io.nekohasekai.sfa.compose.screen.connections.ConnectionsPage
+import io.nekohasekai.sfa.compose.screen.connections.ConnectionsBottomSheet
 import io.nekohasekai.sfa.compose.screen.connections.ConnectionsViewModel
 import io.nekohasekai.sfa.compose.screen.dashboard.DashboardViewModel
 import io.nekohasekai.sfa.compose.screen.dashboard.GroupsCard
@@ -263,9 +260,6 @@ class MainActivity :
     private fun handleIntent(intent: Intent?) {
         if (intent == null) {
             return
-        }
-        if (intent.categories?.contains("de.robv.android.xposed.category.MODULE_SETTINGS") == true) {
-            pendingNavigationRoute.value = "settings/privilege"
         }
         val uri = intent.data ?: return
         if (uri.scheme == "sing-box") {
@@ -833,6 +827,13 @@ class MainActivity :
         val isConnectionsRoute = currentRootRoute == Screen.Connections.route
         val isGroupsRoute = currentRootRoute == Screen.Groups.route
         val isLogRoute = currentRootRoute == Screen.Log.route
+
+        LaunchedEffect(currentRootRoute, showGroupsSheet, showConnectionsSheet) {
+            dashboardViewModel.setUiActive(
+                currentRootRoute == Screen.Dashboard.route || isGroupsRoute || isConnectionsRoute ||
+                    showGroupsSheet || showConnectionsSheet,
+            )
+        }
 
         val isSubScreen = isSettingsSubScreen || isToolsSubScreen || isConnectionsDetail || isProfileRoute
         // Get LogViewModel instance if we're on the Log screen
@@ -1446,71 +1447,11 @@ class MainActivity :
             }
         }
 
-        // Connections ModalBottomSheet
         if (showConnectionsSheet && !useNavigationRail) {
-            val connectionsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            val connectionsViewModel: ConnectionsViewModel = viewModel()
-            val connectionsUiState by connectionsViewModel.uiState.collectAsState()
-            var selectedConnectionId by remember { mutableStateOf<String?>(null) }
-            val selectedConnection = connectionsUiState.allConnections.find { it.id == selectedConnectionId }
-            var cachedConnection by remember { mutableStateOf<Connection?>(null) }
-            if (selectedConnection != null) {
-                cachedConnection = selectedConnection
-            } else if (selectedConnectionId != null && cachedConnection?.isActive == true) {
-                cachedConnection = cachedConnection?.copy(closedAt = System.currentTimeMillis())
-            }
-            val displayConnection = if (selectedConnectionId != null) cachedConnection else null
-
-            LaunchedEffect(Unit) {
-                connectionsViewModel.setVisible(true)
-            }
-
-            DisposableEffect(Unit) {
-                onDispose {
-                    connectionsViewModel.setVisible(false)
-                }
-            }
-
-            BackHandler(enabled = selectedConnectionId != null) {
-                selectedConnectionId = null
-            }
-
-            ModalBottomSheet(
-                onDismissRequest = {
-                    showConnectionsSheet = false
-                    selectedConnectionId = null
-                },
-                sheetState = connectionsSheetState,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(),
-                ) {
-                    if (displayConnection != null) {
-                        ConnectionDetailsScreen(
-                            connection = displayConnection,
-                            onBack = { selectedConnectionId = null },
-                            onClose = {
-                                selectedConnectionId?.let { connectionsViewModel.closeConnection(it) }
-                            },
-                            asSheet = true,
-                        )
-                    } else {
-                        ConnectionsPage(
-                            serviceStatus = currentServiceStatus,
-                            viewModel = connectionsViewModel,
-                            asSheet = true,
-                            showTitle = true,
-                            manageVisibility = false,
-                            onConnectionClick = { selectedConnectionId = it },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
-            }
+            ConnectionsBottomSheet(
+                serviceStatus = currentServiceStatus,
+                onDismiss = { showConnectionsSheet = false },
+            )
         }
     }
 

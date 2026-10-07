@@ -58,7 +58,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavController
 import io.nekohasekai.sfa.R
-import io.nekohasekai.sfa.bg.RootClient
 import io.nekohasekai.sfa.compose.base.UiEvent
 import io.nekohasekai.sfa.compose.base.rememberApplyServiceChangeNotifier
 import io.nekohasekai.sfa.compose.screen.profileoverride.PerAppProxyScanner
@@ -96,7 +95,6 @@ fun ProfileOverrideScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var autoRedirect by remember { mutableStateOf(Settings.autoRedirect) }
     var closeConnectionsOnNodeSwitch by remember { mutableStateOf(Settings.closeConnectionsOnNodeSwitch) }
     var rttDelayTest by remember { mutableStateOf(Settings.rttDelayTest) }
     var perAppProxyEnabled by remember { mutableStateOf(Settings.perAppProxyEnabled) }
@@ -119,12 +117,8 @@ fun ProfileOverrideScreen(
     }
 
     var showShizukuDialog by remember { mutableStateOf(false) }
-    var showRootDialog by remember { mutableStateOf(false) }
-    var showModeDialog by remember { mutableStateOf(false) }
 
-    val showModeSelector = PackageQueryManager.showModeSelector
-    var packageQueryMode by remember { mutableStateOf(Settings.perAppProxyPackageQueryMode) }
-    val useRootMode = packageQueryMode == Settings.PACKAGE_QUERY_MODE_ROOT
+    val showModeSelector = PackageQueryManager.requiresShizuku
 
     val isShizukuInstalled by PackageQueryManager.shizukuInstalled.collectAsState()
     val isShizukuBinderReady by PackageQueryManager.shizukuBinderReady.collectAsState()
@@ -162,10 +156,9 @@ fun ProfileOverrideScreen(
     }
 
     // Auto-disable per-app proxy if Shizuku authorization is revoked (only when using Shizuku mode)
-    LaunchedEffect(isShizukuAvailable, useRootMode, isShizukuStateInitialized, perAppProxyEnabled, showModeSelector) {
+    LaunchedEffect(isShizukuAvailable, isShizukuStateInitialized, perAppProxyEnabled, showModeSelector) {
         if (
             showModeSelector &&
-            !useRootMode &&
             isShizukuStateInitialized &&
             perAppProxyEnabled &&
             !PackageQueryManager.isShizukuAvailable()
@@ -206,79 +199,6 @@ fun ProfileOverrideScreen(
                 bottom = scaffoldPadding.calculateBottomPadding() + 8.dp,
             ),
     ) {
-        // Card 1: Auto Redirect
-        Card(
-            modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            ),
-        ) {
-            ListItem(
-                headlineContent = {
-                    Text(
-                        stringResource(R.string.auto_redirect),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                },
-                supportingContent = {
-                    Text(
-                        stringResource(R.string.auto_redirect_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.Route,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                },
-                trailingContent = {
-                    Switch(
-                        checked = autoRedirect,
-                        onCheckedChange = { checked ->
-                            if (checked && !autoRedirect) {
-                                scope.launch {
-                                    val hasRoot = RootClient.checkRootAvailable()
-                                    if (hasRoot) {
-                                        autoRedirect = true
-                                        withContext(Dispatchers.IO) {
-                                            Settings.autoRedirect = true
-                                        }
-                                        notifyApplyChange(UiEvent.ApplyServiceChange.Mode.Reload)
-                                    } else {
-                                        Toast.makeText(
-                                            context,
-                                            context.getString(R.string.root_access_required),
-                                            Toast.LENGTH_LONG,
-                                        ).show()
-                                    }
-                                }
-                            } else if (!checked) {
-                                autoRedirect = false
-                                scope.launch(Dispatchers.IO) {
-                                    Settings.autoRedirect = false
-                                    withContext(Dispatchers.Main) {
-                                        notifyApplyChange(UiEvent.ApplyServiceChange.Mode.Reload)
-                                    }
-                                }
-                            }
-                        },
-                    )
-                },
-                modifier = Modifier.clip(RoundedCornerShape(12.dp)),
-                colors =
-                ListItemDefaults.colors(
-                    containerColor = Color.Transparent,
-                ),
-            )
-        }
 
         Card(
             modifier =
@@ -387,7 +307,7 @@ fun ProfileOverrideScreen(
 
         // Section: Per-App Proxy
         val canUsePerAppProxy = if (showModeSelector) {
-            if (useRootMode) true else isShizukuAvailable
+            isShizukuAvailable
         } else {
             true
         }
@@ -410,64 +330,6 @@ fun ProfileOverrideScreen(
             ),
         ) {
             Column {
-                // Mode selector (only when privileged query is needed)
-                if (showModeSelector) {
-                    val modeEnabled = !perAppProxyEnabled
-                    val disabledAlpha = 0.38f
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                stringResource(R.string.per_app_proxy_package_query_mode),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (modeEnabled) {
-                                    Color.Unspecified
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
-                                },
-                            )
-                        },
-                        supportingContent = {
-                            Text(
-                                if (useRootMode) "ROOT" else "Shizuku",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (modeEnabled) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = disabledAlpha)
-                                },
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Outlined.Tune,
-                                contentDescription = null,
-                                tint = if (modeEnabled) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
-                                },
-                            )
-                        },
-                        trailingContent = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = if (modeEnabled) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
-                                },
-                            )
-                        },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
-                            .clickable(enabled = modeEnabled) { showModeDialog = true },
-                        colors = ListItemDefaults.colors(
-                            containerColor = Color.Transparent,
-                        ),
-                    )
-                }
-
                 // Enabled toggle
                 ListItem(
                     headlineContent = {
@@ -488,11 +350,7 @@ fun ProfileOverrideScreen(
                             checked = perAppProxyEnabled,
                             onCheckedChange = { checked ->
                                 if (checked && showModeSelector) {
-                                    if (useRootMode) {
-                                        showRootDialog = true
-                                    } else {
-                                        showShizukuDialog = true
-                                    }
+                                    showShizukuDialog = true
                                 } else {
                                     perAppProxyEnabled = checked
                                     scope.launch(Dispatchers.IO) {
@@ -513,9 +371,7 @@ fun ProfileOverrideScreen(
                     },
                     modifier =
                     Modifier.clip(
-                        if (showModeSelector) {
-                            RoundedCornerShape(0.dp)
-                        } else if (perAppProxyEnabled && canUsePerAppProxy) {
+                        if (perAppProxyEnabled && canUsePerAppProxy) {
                             RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
                         } else {
                             RoundedCornerShape(12.dp)
@@ -717,121 +573,6 @@ fun ProfileOverrideScreen(
             )
         }
 
-        // ROOT dialog
-        if (showRootDialog) {
-            AlertDialog(
-                onDismissRequest = { showRootDialog = false },
-                title = {
-                    Text(stringResource(R.string.per_app_proxy))
-                },
-                text = {
-                    Text(stringResource(R.string.per_app_proxy_root_required))
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            scope.launch {
-                                val hasRoot = PackageQueryManager.checkRootAvailable()
-                                if (hasRoot) {
-                                    showRootDialog = false
-                                    perAppProxyEnabled = true
-                                    withContext(Dispatchers.IO) {
-                                        Settings.perAppProxyEnabled = true
-                                    }
-                                    if (managedModeEnabled) {
-                                        scanAndSaveManagedList(shouldNotify = true)
-                                    } else {
-                                        notifyApplyChange(UiEvent.ApplyServiceChange.Mode.Reload)
-                                    }
-                                } else {
-                                    showRootDialog = false
-                                    Toast.makeText(
-                                        context,
-                                        R.string.root_access_denied,
-                                        Toast.LENGTH_LONG,
-                                    ).show()
-                                }
-                            }
-                        },
-                    ) {
-                        Text(stringResource(R.string.ok))
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showRootDialog = false },
-                    ) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                },
-            )
-        }
 
-        // Mode selection dialog
-        if (showModeDialog) {
-            AlertDialog(
-                onDismissRequest = { showModeDialog = false },
-                title = {
-                    Text(stringResource(R.string.per_app_proxy_package_query_mode))
-                },
-                text = {
-                    Column {
-                        ListItem(
-                            headlineContent = { Text("Shizuku") },
-                            leadingContent = {
-                                RadioButton(
-                                    selected = packageQueryMode == Settings.PACKAGE_QUERY_MODE_SHIZUKU,
-                                    onClick = null,
-                                )
-                            },
-                            modifier = Modifier.clickable {
-                                packageQueryMode = Settings.PACKAGE_QUERY_MODE_SHIZUKU
-                                PackageQueryManager.setQueryMode(Settings.PACKAGE_QUERY_MODE_SHIZUKU)
-                                scope.launch(Dispatchers.IO) {
-                                    Settings.perAppProxyPackageQueryMode = Settings.PACKAGE_QUERY_MODE_SHIZUKU
-                                }
-                                if (
-                                    perAppProxyEnabled &&
-                                    isShizukuStateInitialized &&
-                                    !PackageQueryManager.isShizukuAvailable()
-                                ) {
-                                    perAppProxyEnabled = false
-                                    scope.launch(Dispatchers.IO) {
-                                        Settings.perAppProxyEnabled = false
-                                    }
-                                }
-                                notifyApplyChange(UiEvent.ApplyServiceChange.Mode.Reload)
-                                showModeDialog = false
-                            },
-                            colors = ListItemDefaults.colors(
-                                containerColor = Color.Transparent,
-                            ),
-                        )
-                        ListItem(
-                            headlineContent = { Text("ROOT") },
-                            leadingContent = {
-                                RadioButton(
-                                    selected = packageQueryMode == Settings.PACKAGE_QUERY_MODE_ROOT,
-                                    onClick = null,
-                                )
-                            },
-                            modifier = Modifier.clickable {
-                                packageQueryMode = Settings.PACKAGE_QUERY_MODE_ROOT
-                                PackageQueryManager.setQueryMode(Settings.PACKAGE_QUERY_MODE_ROOT)
-                                scope.launch(Dispatchers.IO) {
-                                    Settings.perAppProxyPackageQueryMode = Settings.PACKAGE_QUERY_MODE_ROOT
-                                }
-                                notifyApplyChange(UiEvent.ApplyServiceChange.Mode.Reload)
-                                showModeDialog = false
-                            },
-                            colors = ListItemDefaults.colors(
-                                containerColor = Color.Transparent,
-                            ),
-                        )
-                    }
-                },
-                confirmButton = {},
-            )
-        }
     }
 }

@@ -142,7 +142,8 @@ $patches = @(
     "sing-box-rtt-delay-test.patch",
     "sing-box-rtt-mode-sync.patch",
     "sing-box-rtt-startup-mode.patch",
-    "sing-box-profile-cache-isolation.patch"
+    "sing-box-profile-cache-isolation.patch",
+    "sing-box-reload-memory.patch"
 )
 foreach ($patchName in $patches) {
     $patchPath = Join-Path $repositoryRoot "config\patches\$patchName"

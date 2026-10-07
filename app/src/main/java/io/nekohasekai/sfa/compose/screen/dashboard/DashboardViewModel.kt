@@ -121,6 +121,11 @@ class DashboardViewModel :
     BaseViewModel<DashboardUiState, UiEvent>(),
     CommandClient.Handler {
     private val _serviceStatus = MutableStateFlow(Status.Stopped)
+    private val uiActive = MutableStateFlow(false)
+
+    fun setUiActive(active: Boolean) {
+        uiActive.value = active
+    }
     private val clashModeSwitchMutex = Mutex()
     val serviceStatus: StateFlow<Status> = _serviceStatus.asStateFlow()
 
@@ -155,7 +160,7 @@ class DashboardViewModel :
 
         viewModelScope.launch {
             combine(
-                AppLifecycleObserver.isForeground,
+                combine(AppLifecycleObserver.isForeground, uiActive) { foreground, active -> foreground && active },
                 RemoteControlManager.remoteServer,
                 RemoteControlManager.isConnected,
                 _serviceStatus,

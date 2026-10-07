@@ -1,0 +1,114 @@
+diff --git a/daemon/started_service.go b/daemon/started_service.go
+--- a/daemon/started_service.go
++++ b/daemon/started_service.go
+@@ -261,27 +261,24 @@ func (s *StartedService) StartOrReloadService(ctx context.Context, profileConten
+ 		s.serviceAccess.Unlock()
+ 		return os.ErrClosed
+ 	}
+-	oldInstance := s.instance
+-	if oldInstance != nil {
+-		s.instance = nil
+-		s.updateStatus(ServiceStatus_STOPPING)
+-		s.serviceAccess.Unlock()
++	reloading := s.instance != nil
++	if reloading {
+ 		oomRecorder := service.FromContext[*oomkiller.Recorder](s.ctx)
+ 		if oomRecorder != nil {
+ 			oomRecorder.BeginReload()
+ 			defer oomRecorder.EndReload()
+ 		}
+-		_ = oldInstance.Close()
++		s.closeInstanceForReload()
+ 		runtimeDebug.FreeOSMemory()
+ 		s.serviceAccess.Lock()
+ 	}
+ 	s.startInterrupted = false
+ 	s.updateStatus(ServiceStatus_STARTING)
+-	if oldInstance == nil {
++	if !reloading {
+ 		s.resetLogs()
+ 	}
+ 	s.serviceAccess.Unlock()
+-	instance, err := s.newInstance(ctx, profileContent, options, oldInstance != nil)
++	instance, err := s.newInstance(ctx, profileContent, options, reloading)
+ 	if err != nil {
+ 		s.serviceAccess.Lock()
+ 		s.updateStatusError(err)
+@@ -321,6 +318,18 @@ func (s *StartedService) StartOrReloadService(ctx context.Context, profileConten
+ 	return nil
+ }
+ 
++// Keep the closed instance out of the caller's stack during pre-reload GC.
++// The caller holds serviceAccess; this method releases it before closing.
++//
++//go:noinline
++func (s *StartedService) closeInstanceForReload() {
++	instance := s.instance
++	s.instance = nil
++	s.updateStatus(ServiceStatus_STOPPING)
++	s.serviceAccess.Unlock()
++	_ = instance.Close()
++}
++
+ func (s *StartedService) scheduleStartupSelectorRTT(instance *Instance) {
+ 	if !urltest.RTTEnabled() {
+ 		return
+diff --git a/daemon/reload_memory_test.go b/daemon/reload_memory_test.go
+new file mode 100644
+--- /dev/null
++++ b/daemon/reload_memory_test.go
+@@ -0,0 +1,54 @@
++package daemon
++
++import (
++	"context"
++	"testing"
++	"weak"
++
++	box "github.com/sagernet/sing-box"
++	"github.com/sagernet/sing-box/adapter"
++	"github.com/sagernet/sing-box/adapter/certificate"
++	"github.com/sagernet/sing-box/adapter/endpoint"
++	"github.com/sagernet/sing-box/adapter/inbound"
++	"github.com/sagernet/sing-box/adapter/outbound"
++	boxService "github.com/sagernet/sing-box/adapter/service"
++	"github.com/sagernet/sing-box/dns"
++	"github.com/sagernet/sing-box/dns/transport/local"
++	"github.com/sagernet/sing-box/log"
++	"github.com/sagernet/sing-box/option"
++	"github.com/sagernet/sing-box/protocol/direct"
++)
++
++func TestReloadReleasesOldInstanceBeforeReplacement(t *testing.T) {
++	var previous weak.Pointer[Instance]
++	registry := outbound.NewRegistry()
++	outbound.Register[option.DirectOutboundOptions](registry, "direct", func(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.DirectOutboundOptions) (adapter.Outbound, error) {
++		if previous.Value() != nil {
++			t.Error("closed instance is still retained while constructing its replacement")
++		}
++		return direct.NewOutbound(ctx, router, logger, tag, options)
++	})
++	dnsRegistry := dns.NewTransportRegistry()
++	local.RegisterTransport(dnsRegistry)
++	ctx := box.Context(context.Background(), inbound.NewRegistry(), registry, endpoint.NewRegistry(), dnsRegistry, boxService.NewRegistry(), certificate.NewRegistry())
++	s := NewStartedService(ServiceOptions{Context: ctx, LogMaxLines: 10})
++	t.Cleanup(func() {
++		_ = s.CloseService()
++		s.Close()
++	})
++	const config = `{"log":{"disabled":true},"outbounds":[{"type":"direct","tag":"direct"}]}`
++	for i := 0; i < 4; i++ {
++		if err := s.StartOrReloadService(ctx, config, &OverrideOptions{}); err != nil {
++			t.Fatal(err)
++		}
++		if s.serviceStatus.Status != ServiceStatus_STARTED {
++			t.Fatalf("unexpected service status after reload: %v", s.serviceStatus.Status)
++		}
++		previous = weakCurrentInstance(s)
++	}
++}
++
++//go:noinline
++func weakCurrentInstance(s *StartedService) weak.Pointer[Instance] {
++	return weak.Make(s.instance)
++}

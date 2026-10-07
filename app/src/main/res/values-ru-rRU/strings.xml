@@ -211,8 +211,6 @@
     <string name="allow_bypass">Разрешить обход VPN</string>
     <string name="allow_bypass_description">Если включено, приложения могут обойти это VPN-соединение и использовать базовую сеть напрямую.</string>
     <string name="android_documentation">Документация Android</string>
-    <string name="auto_redirect">Автоматическое перенаправление</string>
-    <string name="auto_redirect_description">Требуются права ROOT</string>
     <string name="close_connections_on_node_switch">Закрывать соединения при переключении</string>
     <string name="close_connections_on_node_switch_description">При смене узла или режима</string>
     <string name="rtt_delay_test">Тест задержки RTT</string>
@@ -253,10 +251,7 @@
     <string name="content_description_app_icon">Значок приложения</string>
     <string name="per_app_proxy_managed_mode">Управляемый режим</string>
     <string name="per_app_proxy_managed_mode_description">Автоматически исключать китайские приложения</string>
-    <string name="per_app_proxy_package_query_mode">Режим</string>
     <string name="per_app_proxy_shizuku_required">При установке из Play Store для работы прокси для каждого приложения требуется Shizuku. Google Play не позволяет нам использовать разрешение QUERY_ALL_PACKAGES (хотя другим подобным приложениям это разрешено), которое необходимо для отображения списка приложений.</string>
-    <string name="per_app_proxy_root_required">При установке из Play Store для функции прокси для отдельных приложений требуются права ROOT. Google Play не разрешает нам использовать разрешение QUERY_ALL_PACKAGES (хотя другим подобным приложениям это разрешено), которое необходимо для отображения списка приложений.</string>
-    <string name="privileged_access_required">Для полного списка приложений необходимы права ROOT или доступ через Shizuku</string>
 
     <!-- Permissions -->
     <string name="background_permission">Фоновое разрешение</string>
@@ -267,8 +262,6 @@
     <string name="location_permission_background_description">В Android 10 и новее требуется разрешение на &lt;strong&gt;определение местоположения в фоне&lt;/strong&gt;. Выберите &lt;strong&gt;«Разрешить всегда»&lt;/strong&gt; для предоставления этого разрешения.</string>
     <string name="notification_permission_title">Разрешение на уведомления</string>
     <string name="notification_permission_required_description">Без разрешения на отправку уведомлений sing-box не сможет отображать скорость сети в реальном времени. Предоставьте разрешение или отключите уведомления о скорости перед запуском службы.</string>
-    <string name="root_access_required">Требуются права ROOT</string>
-    <string name="root_access_denied">Доступ ROOT запрещен</string>
 
     <!-- Updates -->
     <string name="check_update">Проверить обновления</string>
@@ -312,7 +305,6 @@
     <string name="silent_install_verify_failed">%s недоступен или доступ запрещен</string>
     <string name="install_method_package_installer">PackageInstaller</string>
     <string name="install_method_shizuku">Shizuku</string>
-    <string name="install_method_root">ROOT</string>
     <string name="package_installer_not_available">Разрешение на установку не предоставлено</string>
     <string name="grant_install_permission">Предоставить разрешение на установку</string>
     <string name="grant_install_permission_description">Разрешить установку приложений из этого источника</string>
@@ -597,42 +589,8 @@
     <string name="power_report_enable">Включить отчёт об энергопотреблении</string>
     <string name="power_report_enable_description">Записывать статистику процессорного времени, пробуждений и трафика сервиса. Отчёт сохраняется для каждого запуска сервиса.</string>
 
-    <!-- Xposed Module -->
-    <string name="xposed_description">Привилегированное расширение для sing-box</string>
 
-    <!-- Privileged Enhancement -->
-    <string name="privilege_module_title">Привилегированные модули</string>
-    <string name="lsposed_module_activated">Модуль LSPosed активирован</string>
-    <string name="lsposed_module_pending_update">Ожидается обновление модуля LSPosed</string>
-    <string name="lsposed_module_pending_downgrade">Ожидается откат модуля LSPosed</string>
-    <string name="lsposed_module_not_activated">Модуль LSPosed не активирован</string>
-    <string name="privilege_settings">Привилегированное расширение</string>
-    <string name="privilege_settings_hide_title">Скрытие настроек</string>
-    <string name="privilege_settings_hide_description">Защита от обнаружения VPN для выбранных приложений</string>
-    <string name="privilege_settings_hide_manage">Управление</string>
-    <string name="privilege_settings_hide_test">Запустить тест</string>
-    <string name="privilege_settings_hide_test_result">Результат теста</string>
-    <string name="privilege_settings_hide_test_running">Выполняются тесты на обнаружение...</string>
-    <string name="privilege_settings_hide_test_not_detected">Не обнаружено</string>
-    <string name="privilege_settings_interface_rename_title">Переименование интерфейса</string>
-    <string name="privilege_settings_interface_prefix">Префикс интерфейса</string>
-    <string name="privilege_settings_vpn_detection_title">Обнаружение VPN</string>
-    <string name="privilege_settings_view_logs">Просмотреть журнал</string>
-    <string name="privilege_settings_export_debug">Экспорт отладочной информации</string>
-    <string name="privilege_settings_hook_logs_empty">Журнал пуст</string>
-    <string name="privilege_settings_export_debug_complete">Экспорт завершён</string>
-    <string name="privilege_settings_export_debug_message">Файл содержит конфиденциальную информацию и не должен распространяться публично. Размер: %s</string>
-    <string name="privilege_settings_export_debug_failed">Не удалось экспортировать отладочную информацию: %s</string>
-    <string name="privilege_settings_risky_app_title">Предупреждение</string>
-    <string name="privilege_settings_risky_vpn_message_single">Это приложение - VPN-клиент. Скрытие VPN может вызвать проблемы: %1$s</string>
-    <string name="privilege_settings_risky_vpn_message_multi">Эти приложения - VPN-клиенты. Скрытие VPN может вызвать проблемы: %1$s</string>
-    <string name="privilege_settings_risky_management_message_single">Это приложение имеет права управления сетью. Скрытие VPN может вызвать проблемы: %1$s</string>
-    <string name="privilege_settings_risky_management_message_multi">Эти приложения имеют права управления сетью. Скрытие VPN может вызвать проблемы: %1$s</string>
-    <string name="privilege_module_restart_action">Перезагрузить</string>
-    <string name="privilege_module_restart_failed">Не удалось запросить перезагрузку: %1$s</string>
-    <string name="privilege_module_restart_notification_title">Требуется перезагрузка</string>
-    <string name="privilege_module_restart_notification_message">Модуль LSPosed обновлён. Перезагрузите устройство, чтобы применить изменения.</string>
-    <string name="privilege_module_restart_channel">Модуль LSPosed</string>
+    <string name="logs_empty">Журнал пуст</string>
 
     <!-- Remote Control -->
     <string name="remote_control">Удаленное управление</string>

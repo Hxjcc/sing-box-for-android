@@ -1,9 +1,8 @@
 package io.nekohasekai.sfa.compose.screen.connections
 
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.drawable.BitmapDrawable
+import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.util.LruCache
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -40,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -49,52 +49,52 @@ import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.sfa.R
 import io.nekohasekai.sfa.compose.model.Connection
 import io.nekohasekai.sfa.utils.RemoteControlManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-private fun Drawable.toBitmap(): Bitmap {
-    if (this is BitmapDrawable) return bitmap
-    val bitmap = Bitmap.createBitmap(
-        intrinsicWidth.coerceAtLeast(1),
-        intrinsicHeight.coerceAtLeast(1),
-        Bitmap.Config.ARGB_8888,
-    )
+private fun Drawable.toBitmap(size: Int): Bitmap {
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    setBounds(0, 0, canvas.width, canvas.height)
-    draw(canvas)
+    val originalBounds = Rect(bounds)
+    try {
+        setBounds(0, 0, size, size)
+        draw(canvas)
+    } finally {
+        bounds = originalBounds
+    }
+    bitmap.prepareToDraw()
     return bitmap
 }
 
-data class AppInfo(val icon: ImageBitmap, val label: String)
-
-private val appInfoCache = LruCache<String, AppInfo>(64)
+private val appIconCache = object : LruCache<String, ImageBitmap>(2 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 4
+}
+private val appIconLoadMutex = Mutex()
 
 @Composable
-private fun rememberAppInfo(packageName: String): AppInfo? {
-    val context = LocalContext.current
-    val state = produceState<AppInfo?>(initialValue = null, packageName) {
-        val cached = synchronized(appInfoCache) { appInfoCache.get(packageName) }
-        if (cached != null) {
-            value = cached
-            return@produceState
-        }
-
-        val loaded = withContext(Dispatchers.IO) {
-            try {
-                val pm = context.packageManager
-                val appInfo = pm.getApplicationInfo(packageName, 0)
-                AppInfo(
-                    icon = appInfo.loadIcon(pm).toBitmap().asImageBitmap(),
-                    label = appInfo.loadLabel(pm).toString(),
-                )
-            } catch (_: PackageManager.NameNotFoundException) {
-                null
+private fun rememberAppIcon(packageName: String): ImageBitmap? {
+    val context = LocalContext.current.applicationContext
+    val size = with(LocalDensity.current) { 32.dp.roundToPx().coerceAtLeast(1) }
+    val key = "$packageName:$size"
+    val state = produceState<ImageBitmap?>(appIconCache.get(key), key) {
+        value = withContext(Dispatchers.IO) {
+            // The initial snapshot often contains many connections from one app.
+            // Recheck after waiting so only one row decodes its icon.
+            appIconLoadMutex.withLock {
+                appIconCache.get(key) ?: try {
+                    val pm = context.packageManager
+                    pm.getApplicationInfo(packageName, 0).loadIcon(pm)
+                        .toBitmap(size).asImageBitmap().also { appIconCache.put(key, it) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
+                }
             }
         }
-        if (loaded != null) {
-            synchronized(appInfoCache) { appInfoCache.put(packageName, loaded) }
-        }
-        value = loaded
     }
     return state.value
 }
@@ -113,7 +113,7 @@ fun ConnectionItem(connection: Connection, onClick: () -> Unit, onClose: () -> U
         } else {
             connection.processInfo?.packageNames?.firstOrNull()
         }
-    val appInfo = packageName?.let { rememberAppInfo(it) }
+    val appIcon = packageName?.let { rememberAppIcon(it) }
 
     Box(modifier = modifier) {
         Card(
@@ -132,9 +132,9 @@ fun ConnectionItem(connection: Connection, onClick: () -> Unit, onClose: () -> U
             ) {
                 // Column 1: App icon
                 if (!isRemote) {
-                    if (appInfo != null) {
+                    if (appIcon != null) {
                         Image(
-                            bitmap = appInfo.icon,
+                            bitmap = appIcon,
                             contentDescription = null,
                             modifier = Modifier.size(32.dp),
                         )

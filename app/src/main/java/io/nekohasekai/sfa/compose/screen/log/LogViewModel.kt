@@ -30,6 +30,12 @@ class LogViewModel :
         private val maxLines = 3000
     }
 
+    private val visible = MutableStateFlow(false)
+
+    fun setVisible(value: Boolean) {
+        visible.value = value
+    }
+
     private val bufferedLogs = LinkedList<ProcessedLogEntry>()
     private val commandClient =
         CommandClient(
@@ -43,7 +49,7 @@ class LogViewModel :
     init {
         viewModelScope.launch {
             combine(
-                AppLifecycleObserver.isForeground,
+                combine(AppLifecycleObserver.isForeground, visible) { foreground, shown -> foreground && shown },
                 RemoteControlManager.remoteServer,
                 RemoteControlManager.isConnected,
                 serviceStatusFlow,
@@ -132,21 +138,14 @@ class LogViewModel :
     }
 
     override fun appendLogs(message: List<LogEntry>) {
-        val processedLogs = message.map { processLogEntry(it) }
+        if (!visible.value) return
+        val processedLogs = message.takeLast(maxLines).map { processLogEntry(it) }
         viewModelScope.launch(Dispatchers.Main) {
+            if (!visible.value) return@launch
             if (_uiState.value.isPaused) {
-                bufferedLogs.addAll(processedLogs)
+                bufferedLogs.appendBounded(processedLogs, maxLines)
             } else {
-                val totalSize = allLogs.size + processedLogs.size
-                val removeCount = (totalSize - maxLines).coerceAtLeast(0)
-
-                if (removeCount > 0) {
-                    repeat(removeCount) {
-                        allLogs.removeFirst()
-                    }
-                }
-
-                allLogs.addAll(processedLogs)
+                allLogs.appendBounded(processedLogs, maxLines)
                 updateDisplayedLogs()
 
                 if (_autoScrollEnabled.value && !_uiState.value.isPaused && !_uiState.value.isSearchActive) {
@@ -159,16 +158,7 @@ class LogViewModel :
     override fun togglePause() {
         val currentState = _uiState.value
         if (currentState.isPaused && bufferedLogs.isNotEmpty()) {
-            val totalSize = allLogs.size + bufferedLogs.size
-            val removeCount = (totalSize - maxLines).coerceAtLeast(0)
-
-            if (removeCount > 0) {
-                repeat(removeCount) {
-                    allLogs.removeFirst()
-                }
-            }
-
-            allLogs.addAll(bufferedLogs)
+            allLogs.appendBounded(bufferedLogs, maxLines)
             bufferedLogs.clear()
         }
 

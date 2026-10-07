@@ -57,13 +57,18 @@ object Settings {
     }
     var githubToken by dataStore.string(SettingsKey.GITHUB_TOKEN) { "" }
     var silentInstallEnabled by dataStore.boolean(SettingsKey.SILENT_INSTALL_ENABLED) { false }
-    var silentInstallMethod by dataStore.string(SettingsKey.SILENT_INSTALL_METHOD) {
+    private var storedSilentInstallMethod by dataStore.string(SettingsKey.SILENT_INSTALL_METHOD) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             "PACKAGE_INSTALLER"
         } else {
             "SHIZUKU"
         }
     }
+    // Old privileged installer selections fall back to the system installer.
+    var silentInstallMethod: String
+        get() = storedSilentInstallMethod.takeIf { it == "PACKAGE_INSTALLER" || it == "SHIZUKU" } ?: "PACKAGE_INSTALLER"
+        set(value) { storedSilentInstallMethod = value }
+
     var fdroidMirrorUrl by dataStore.string(SettingsKey.FDROID_MIRROR_URL) { "https://f-droid.org/repo" }
     var fdroidCustomMirrors by dataStore.stringSet(SettingsKey.FDROID_CUSTOM_MIRRORS) { emptySet() }
     var autoUpdateEnabled by dataStore.boolean(SettingsKey.AUTO_UPDATE_ENABLED) { false }
@@ -76,7 +81,6 @@ object Settings {
     const val PER_APP_PROXY_EXCLUDE = 1
     const val PER_APP_PROXY_INCLUDE = 2
 
-    var autoRedirect by dataStore.boolean(SettingsKey.AUTO_REDIRECT) { false }
     var closeConnectionsOnNodeSwitch by dataStore.boolean(SettingsKey.CLOSE_CONNECTIONS_ON_NODE_SWITCH) { false }
     var rttDelayTest by dataStore.boolean(SettingsKey.RTT_DELAY_TEST) { false }
     var perAppProxyEnabled by dataStore.boolean(SettingsKey.PER_APP_PROXY_ENABLED) { false }
@@ -84,10 +88,6 @@ object Settings {
     var perAppProxyList by dataStore.stringSet(SettingsKey.PER_APP_PROXY_LIST) { emptySet() }
     var perAppProxyManagedMode by dataStore.boolean(SettingsKey.PER_APP_PROXY_MANAGED_MODE) { false }
     var perAppProxyManagedList by dataStore.stringSet(SettingsKey.PER_APP_PROXY_MANAGED_LIST) { emptySet() }
-
-    const val PACKAGE_QUERY_MODE_SHIZUKU = "SHIZUKU"
-    const val PACKAGE_QUERY_MODE_ROOT = "ROOT"
-    var perAppProxyPackageQueryMode by dataStore.string(SettingsKey.PER_APP_PROXY_PACKAGE_QUERY_MODE) { PACKAGE_QUERY_MODE_SHIZUKU }
 
     fun getEffectivePerAppProxyMode(): Int = if (perAppProxyManagedMode) {
         PER_APP_PROXY_EXCLUDE
@@ -103,13 +103,6 @@ object Settings {
 
     var allowBypass by dataStore.boolean(SettingsKey.ALLOW_BYPASS) { false }
     var systemProxyEnabled by dataStore.boolean(SettingsKey.SYSTEM_PROXY_ENABLED) { true }
-
-    var privilegeSettingsEnabled by dataStore.boolean(SettingsKey.PRIVILEGE_SETTINGS_ENABLED) { false }
-    var privilegeSettingsList by dataStore.stringSet(SettingsKey.PRIVILEGE_SETTINGS_LIST) { emptySet() }
-    var privilegeSettingsInterfaceRenameEnabled by dataStore.boolean(
-        SettingsKey.PRIVILEGE_SETTINGS_INTERFACE_RENAME_ENABLED,
-    ) { false }
-    var privilegeSettingsInterfacePrefix by dataStore.string(SettingsKey.PRIVILEGE_SETTINGS_INTERFACE_PREFIX) { "wlan" }
 
     var oomKillerEnabled by dataStore.boolean(SettingsKey.OOM_KILLER_ENABLED) { false }
     var oomKillerDisabled by dataStore.boolean(SettingsKey.OOM_KILLER_DISABLED) { true }

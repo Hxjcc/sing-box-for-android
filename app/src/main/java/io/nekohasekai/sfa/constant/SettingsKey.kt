@@ -18,7 +18,6 @@ object SettingsKey {
     const val LOG_PAUSED = "log_paused"
     const val LOG_FILTER_LEVEL = "log_filter_level"
 
-    const val AUTO_REDIRECT = "auto_redirect"
     const val CLOSE_CONNECTIONS_ON_NODE_SWITCH = "close_connections_on_node_switch"
     const val RTT_DELAY_TEST = "rtt_delay_test"
     const val PER_APP_PROXY_ENABLED = "per_app_proxy_enabled"
@@ -26,15 +25,10 @@ object SettingsKey {
     const val PER_APP_PROXY_LIST = "per_app_proxy_list"
     const val PER_APP_PROXY_MANAGED_MODE = "per_app_proxy_managed_mode"
     const val PER_APP_PROXY_MANAGED_LIST = "per_app_proxy_managed_list"
-    const val PER_APP_PROXY_PACKAGE_QUERY_MODE = "per_app_proxy_package_query_mode"
 
     const val ALLOW_BYPASS = "allow_bypass"
     const val SYSTEM_PROXY_ENABLED = "system_proxy_enabled"
 
-    const val PRIVILEGE_SETTINGS_ENABLED = "hide_settings_enabled"
-    const val PRIVILEGE_SETTINGS_LIST = "hide_settings_list"
-    const val PRIVILEGE_SETTINGS_INTERFACE_RENAME_ENABLED = "hide_settings_interface_rename_enabled"
-    const val PRIVILEGE_SETTINGS_INTERFACE_PREFIX = "hide_settings_interface_prefix"
 
     // OOM killer
     const val OOM_KILLER_ENABLED = "oom_killer_enabled"
