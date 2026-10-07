@@ -99,26 +99,24 @@ $env:GOTOOLCHAIN = "local"
 $env:PATH = "$javaHomePath\bin;$goBinPath;$(Join-Path $goPath 'bin');$env:PATH"
 Write-Host "Go toolchain: $actualGoVersion"
 
-$coreCommit = "b609f959f57ce34416c51c7b87ce4a76f2e1df56"
-$coreVersionTag = "v1.15.0-alpha.8"
+$coreCommit = "fe92ab3e78a9bb7d448c155ef6906218e2ca5453"
+$coreVersionTag = "v1.15.0-alpha.10"
 $coreFetchDepth = 64
-$expectedCoreDescription = "v1.15.0-alpha.8"
 git init $sourceDirectory
 if ($LASTEXITCODE -ne 0) { throw "Unable to initialize the sing-box source tree" }
 git -C $sourceDirectory remote add origin https://github.com/SagerNet/sing-box.git
 if ($LASTEXITCODE -ne 0) { throw "Unable to configure the sing-box source remote" }
 git -C $sourceDirectory fetch --depth $coreFetchDepth origin $coreCommit "refs/tags/${coreVersionTag}:refs/tags/${coreVersionTag}"
 if ($LASTEXITCODE -ne 0) { throw "Unable to fetch sing-box core $coreCommit" }
-git -C $sourceDirectory checkout --detach FETCH_HEAD
+git -C $sourceDirectory checkout --detach $coreCommit
 if ($LASTEXITCODE -ne 0) { throw "Unable to check out sing-box core $coreCommit" }
 $actualCoreCommit = (git -C $sourceDirectory rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $actualCoreCommit -ne $coreCommit) {
     throw "Unexpected sing-box core commit: $actualCoreCommit"
 }
-$actualCoreDescription = (git -C $sourceDirectory describe --tags --abbrev=7).Trim()
-if ($LASTEXITCODE -ne 0 -or $actualCoreDescription -ne $expectedCoreDescription) {
-    throw "Unexpected sing-box core version: $actualCoreDescription"
-}
+$actualCoreDescription = (git -C $sourceDirectory describe --tags --always --abbrev=7).Trim()
+$tagCoreCommit = (git -C $sourceDirectory rev-parse "${coreVersionTag}^{commit}").Trim()
+if ($LASTEXITCODE -ne 0) { throw "Unable to resolve core release tag $coreVersionTag" }
 Write-Host "Core source: $actualCoreDescription"
 $versionHeading = Get-Content -LiteralPath (Join-Path $sourceDirectory "docs\changelog.md") |
     Select-String -Pattern '^#### ([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)\s*$' |
@@ -128,7 +126,7 @@ if ($null -eq $versionHeading) {
 }
 $baseCoreVersion = $versionHeading.Matches[0].Groups[1].Value
 $shortCoreCommit = $actualCoreCommit.Substring(0, 7)
-$embeddedCoreVersion = if ($actualCoreDescription -eq $coreVersionTag) {
+$embeddedCoreVersion = if ($actualCoreCommit -eq $tagCoreCommit) {
     $baseCoreVersion
 } else {
     "$baseCoreVersion-$shortCoreCommit"

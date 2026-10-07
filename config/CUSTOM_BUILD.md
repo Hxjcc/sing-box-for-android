@@ -2,7 +2,7 @@
 
 ## Custom libbox
 
-The Traffic variant uses a patched ARM64 sing-box core pinned to official testing commit `b609f959f57ce34416c51c7b87ce4a76f2e1df56`, paired with Android upstream commit `3295b6b35811ba71df6363d6c87bc180acc2e3b9` (1.15.0-alpha.8). The build reads the release version from the pinned core changelog, appends the commit hash for untagged commits, and generates a source-level fallback so gomobile cannot leave it as `unknown`. The current result is `1.15.0-alpha.8`, verified against the official `v1.15.0-alpha.8` tag. Rebuild it from a clean source tree with:
+The Traffic variant uses a patched ARM64 sing-box core pinned to official testing commit `fe92ab3e78a9bb7d448c155ef6906218e2ca5453`, paired with Android upstream commit `5c7b4ce969b926063737d059edf7b256c8f56ed0` (1.15.0-alpha.10). These were the upstream branch heads checked on 2026-10-07. The build reads the release version from the pinned core changelog, appends the commit hash when it differs from the release tag, and generates a source-level fallback so gomobile cannot leave it as `unknown`. The current result is `1.15.0-alpha.10-fe92ab3`; this testing commit differs from the published `v1.15.0-alpha.10` tag. The script checks out and verifies the exact pinned commit instead of relying on `FETCH_HEAD` after a multi-ref fetch. Rebuild it from a clean source tree with:
 
 ```powershell
 .\scripts\build-custom-libbox.ps1 -Force
@@ -17,6 +17,12 @@ The core uses sing-tun's own TCP/IP stack when `stack` is omitted. The `stack` o
 The upstream libbox build no longer enables `with_gvisor`. Profiles explicitly selecting `mixed` or `gvisor` must remove `stack` before starting the service; omitting it selects the built-in Go stack.
 
 App and core must be upgraded together from alpha.7 onwards. The Android alpha.8 code calls two libbox APIs that only exist in the matching core: `Libbox.hasTunInbound(configContent)` for VPN service detection in `Settings.kt`, and `BoxNetworkInterface.dnsSearchDomain` for reporting interface search domains in `PlatformInterfaceWrapper.kt`. Core alpha.8 also replaces the `OutboundGroup.Now()` binding with `Selected(network)` / `AttachConnection(closer)` and adds `dns_server_address` / `dns_search_domain` rule items, none of which require further Kotlin changes.
+
+## October 2026 upstream update
+
+The October 7 update integrates upstream connection empty states, service-ready navigation, remote-control error handling without automatic retries, and reduced GitHub update-check requests. Connection subscriptions use the upstream distinct `(ready, remoteServerId)` state so switching remote servers reconnects correctly. Disconnecting clears stale connection data and invalidates pending snapshots, while preserving the custom batched snapshot processing and deferred bottom-sheet initialization. The latest core refactors component lifecycle cleanup to `adapter.Scope`; the five existing custom patches apply to that source and retain the RTT startup, profile selection isolation and reload-memory behavior. Root-only integrations remain removed.
+
+The generated Android bindings for the platform interface, command callbacks, static Libbox methods, setup options and custom override options are unchanged from the previous personal build. No additional Kotlin-to-core API shim is required. The script's core tests verify version embedding, profile selection isolation and releasing old instances during reload.
 
 ## Memory during reload
 
