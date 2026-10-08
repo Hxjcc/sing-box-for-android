@@ -1,5 +1,7 @@
 # Custom Traffic build
 
+Release changes and upstream commit references are recorded in [CHANGELOG.md](../CHANGELOG.md).
+
 ## Custom libbox
 
 The Traffic variant uses a patched ARM64 sing-box core pinned to official testing commit `fe92ab3e78a9bb7d448c155ef6906218e2ca5453`, paired with Android upstream commit `5c7b4ce969b926063737d059edf7b256c8f56ed0` (1.15.0-alpha.10). These were the upstream branch heads checked on 2026-10-07. The build reads the release version from the pinned core changelog, appends the commit hash when it differs from the release tag, and generates a source-level fallback so gomobile cannot leave it as `unknown`. The current result is `1.15.0-alpha.10-fe92ab3`; this testing commit differs from the published `v1.15.0-alpha.10` tag. The script checks out and verifies the exact pinned commit instead of relying on `FETCH_HEAD` after a multi-ref fetch. Rebuild it from a clean source tree with:

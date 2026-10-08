@@ -2,6 +2,11 @@
 
 Experimental Android client for sing-box, the universal proxy platform.
 
+## Personal build
+
+- [更新记录 / Changelog](CHANGELOG.md)
+- [Custom build instructions](config/CUSTOM_BUILD.md)
+
 ## Documentation
 
 https://sing-box.sagernet.org/installation/clients/sfa/
